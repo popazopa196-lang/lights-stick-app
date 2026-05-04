@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Lights Stick App — Гость</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            transition: background-color 0.05s linear;
+            min-height: 100vh;
+            background-color: #000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        }
+        .info {
+            text-align: center;
+            background: rgba(0,0,0,0.6);
+            padding: 12px 24px;
+            border-radius: 60px;
+            color: white;
+            font-size: 1rem;
+            backdrop-filter: blur(8px);
+            pointer-events: none;
+        }
+        .footer {
+            position: fixed;
+            bottom: 16px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 11px;
+            color: rgba(255,255,255,0.3);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+<div class="info" id="statusMessage">✨ Lights Stick App — готов</div>
+<div class="footer">цвет и вспышка со сцены</div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+    const socket = io();
+    let flashTimeout = null;
+    let originalColor = '#000000';
+
+    function setColor(color) {
+        if (flashTimeout) clearTimeout(flashTimeout);
+        document.body.style.backgroundColor = color;
+        originalColor = color;
+        document.getElementById('statusMessage').innerHTML = '🎨 режим: цвет со сцены';
+    }
+
+    function flashEffect(durationMs) {
+        if (flashTimeout) clearTimeout(flashTimeout);
+        const body = document.body;
+        const originalBg = body.style.backgroundColor;
+        body.style.backgroundColor = '#ffffff';
+        document.getElementById('statusMessage').innerHTML = '⚡ ВСПЫШКА!';
+
+        // Пытаемся включить фонарик (только на Android + Chrome)
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(stream => {
+                    const track = stream.getVideoTracks()[0];
+                    if (track && track.applyConstraints) {
+                        track.applyConstraints({ advanced: [{ torch: true }] });
+                        setTimeout(() => {
+                            track.applyConstraints({ advanced: [{ torch: false }] });
+                            stream.getTracks().forEach(t => t.stop());
+                        }, durationMs);
+                    } else {
+                        stream.getTracks().forEach(t => t.stop());
+                    }
+                })
+                .catch(e => console.log('Фонарик не поддерживается браузером'));
+        }
+
+        flashTimeout = setTimeout(() => {
+            document.body.style.backgroundColor = originalBg;
+            document.getElementById('statusMessage').innerHTML = '🔆 вспышка завершена';
+            flashTimeout = null;
+        }, durationMs);
+    }
+
+    socket.on('command', (cmd) => {
+        if (cmd.mode === 'color') {
+            setColor(cmd.value);
+        } else if (cmd.mode === 'flash') {
+            flashEffect(cmd.value);
+        }
+    });
+</script>
+</body>
+</html>
