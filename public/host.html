@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Lights Stick App — Пульт</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            background: #0a0f1e;
+            margin: 0;
+            padding: 16px;
+            color: white;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background: #11161f;
+            border-radius: 40px;
+            padding: 20px;
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.6rem;
+            margin: 0 0 8px;
+        }
+        .qr {
+            background: #0c1018;
+            border-radius: 24px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+        canvas {
+            background: white;
+            border-radius: 16px;
+            margin-bottom: 10px;
+        }
+        .url {
+            background: #00000066;
+            padding: 8px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            word-break: break-all;
+        }
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin: 20px 0;
+        }
+        .color-btn {
+            border: none;
+            border-radius: 60px;
+            padding: 14px 0;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.05s linear;
+        }
+        .color-btn:active {
+            transform: scale(0.96);
+        }
+        .flash-btn {
+            background: #ff9500;
+            border: none;
+            border-radius: 60px;
+            padding: 14px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+            width: 100%;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .counter {
+            background: #00000044;
+            border-radius: 60px;
+            padding: 10px;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>✨ Lights Stick App</h1>
+    <p>Пульт организатора (цвет + вспышка)</p>
+
+    <div class="qr">
+        <canvas id="qrCanvas" width="160" height="160"></canvas>
+        <div class="url" id="guestUrl">Загрузка...</div>
+    </div>
+
+    <div class="color-grid">
+        <button class="color-btn" style="background:#ff3b30;" data-color="#ff3b30">🔴 КРАСНЫЙ</button>
+        <button class="color-btn" style="background:#34c759;" data-color="#34c759">🟢 ЗЕЛЁНЫЙ</button>
+        <button class="color-btn" style="background:#007aff;" data-color="#007aff">🔵 СИНИЙ</button>
+        <button class="color-btn" style="background:#ffcc00;" data-color="#ffcc00">🟡 ЖЁЛТЫЙ</button>
+        <button class="color-btn" style="background:#af52de;" data-color="#af52de">🟣 ФИОЛЕТ</button>
+        <button class="color-btn" style="background:#ffffff;" data-color="#ffffff">⬜ БЕЛЫЙ</button>
+    </div>
+
+    <button class="flash-btn" id="flashBtn">📸 ВСПЫШКА (3 сек)</button>
+
+    <div class="counter">
+        📱 Гостей в зале: <span id="connectedCount">0</span>
+    </div>
+    <div style="font-size: 11px; margin-top: 16px;">Гости сканируют QR → открывают в браузере → получают команды</div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
+<script>
+    const socket = io();
+
+    function generateGuestLink() {
+        const base = window.location.origin;
+        const guestUrl = base + '/guest.html';
+        document.getElementById('guestUrl').innerText = guestUrl;
+        new QRCode(document.getElementById('qrCanvas'), {
+            text: guestUrl,
+            width: 160,
+            height: 160
+        });
+    }
+
+    function sendCommand(mode, value) {
+        socket.emit('host-command', { mode, value });
+    }
+
+    document.querySelectorAll('.color-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            sendCommand('color', btn.getAttribute('data-color'));
+        });
+    });
+
+    document.getElementById('flashBtn').addEventListener('click', () => {
+        sendCommand('flash', 3000);
+    });
+
+    socket.on('clients-update', (count) => {
+        document.getElementById('connectedCount').innerText = count;
+    });
+
+    generateGuestLink();
+</script>
+</body>
+</html>
