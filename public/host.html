@@ -37,7 +37,7 @@
             padding: 16px;
             margin: 16px 0;
         }
-        canvas {
+        #qrCanvas {
             background: white;
             border-radius: 16px;
             margin-bottom: 10px;
@@ -123,15 +123,30 @@
         const base = window.location.origin;
         const guestUrl = base + '/guest.html';
         document.getElementById('guestUrl').innerText = guestUrl;
-        new QRCode(document.getElementById('qrCanvas'), {
-            text: guestUrl,
-            width: 160,
-            height: 160
-        });
+
+        const canvas = document.getElementById('qrCanvas');
+        if (canvas.hasChildNodes) {
+            while (canvas.firstChild) {
+                canvas.removeChild(canvas.firstChild);
+            }
+        }
+
+        try {
+            new QRCode(canvas, {
+                text: guestUrl,
+                width: 160,
+                height: 160,
+                colorDark: "#000000",
+                colorLight: "#ffffff"
+            });
+        } catch(e) {
+            console.error('Ошибка создания QR:', e);
+        }
     }
 
     function sendCommand(mode, value) {
         socket.emit('host-command', { mode, value });
+        console.log('Команда отправлена:', mode, value);
     }
 
     document.querySelectorAll('.color-btn').forEach(btn => {
@@ -144,11 +159,23 @@
         sendCommand('flash', 3000);
     });
 
+    socket.on('connect', () => {
+        console.log('✅ Подключено к серверу');
+        document.getElementById('connectedCount').innerText = 'Соединение...';
+    });
+
+    socket.on('connect_error', (err) => {
+        console.error('❌ Ошибка подключения:', err);
+        document.getElementById('connectedCount').innerText = 'Ошибка соединения';
+    });
+
     socket.on('clients-update', (count) => {
         document.getElementById('connectedCount').innerText = count;
     });
 
-    generateGuestLink();
+    window.addEventListener('load', () => {
+        setTimeout(generateGuestLink, 500);
+    });
 </script>
 </body>
 </html>
