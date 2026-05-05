@@ -16,12 +16,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            font-family: system-ui, sans-serif;
             background: linear-gradient(135deg, #0a1a3a, #1a2a4a);
             animation: gradientShift 8s ease infinite alternate;
-            color: rgba(255, 255, 255, 0.95);
+            color: white;
             padding: 2rem;
-            margin: 0;
+            transition: none;
         }
         @keyframes gradientShift {
             0% { background: linear-gradient(135deg, #0a1a3a, #1a2a4a); }
@@ -34,23 +34,10 @@
             border-radius: 3rem;
             padding: 2rem;
             text-align: center;
-            transition: all 0.3s ease;
-        }
-        /* Режим шоу: убираем фон, blur и текст */
-        body.show-mode .container {
-            background: transparent !important;
-            backdrop-filter: none !important;
-            padding: 0 !important;
-        }
-        body.show-mode {
-            background: #0a1a3a !important;
-            animation: none !important;
         }
         .message-text {
             font-size: clamp(1.8rem, 7vw, 3rem);
-            line-height: 1.3;
             font-weight: 800;
-            transition: opacity 0.3s ease;
         }
         .message-text.hidden {
             display: none;
@@ -64,9 +51,6 @@
             right: 0;
             text-align: center;
         }
-        body.show-mode .footer-tip {
-            opacity: 0.2;
-        }
     </style>
 </head>
 <body>
@@ -79,6 +63,7 @@
 <script>
     const socket = io();
     
+    // Фразы
     const messages = [
         "✨ РГУТИС ЭТО Я, РГУТИС ЭТО МЫ ✨",
         "🎤 НЕ ЗАБУДЬ ГРОМКО ПОДДЕРЖИВАТЬ ВЫСТУПАЮЩИХ 🎤",
@@ -90,27 +75,22 @@
     let currentIndex = 0;
     let autoInterval = null;
     let strobeInterval = null;
-    let textVisible = true;
+    let isStrobeOn = false;
+    let isShowMode = false;
     const messageEl = document.getElementById('mainMessage');
     const bodyEl = document.body;
     
     // Автосмена фраз
-    function updateMessage() {
-        if (textVisible && messageEl && !messageEl.classList.contains('hidden')) {
-            messageEl.style.opacity = '0';
-            setTimeout(() => {
-                messageEl.innerText = messages[currentIndex];
-                messageEl.style.opacity = '1';
-            }, 150);
-        }
-    }
-    
     function startAutoSwitch() {
         if (autoInterval) clearInterval(autoInterval);
         autoInterval = setInterval(() => {
-            if (textVisible && !bodyEl.classList.contains('show-mode')) {
+            if (!isShowMode) {
                 currentIndex = (currentIndex + 1) % messages.length;
-                updateMessage();
+                messageEl.style.opacity = '0';
+                setTimeout(() => {
+                    messageEl.innerText = messages[currentIndex];
+                    messageEl.style.opacity = '1';
+                }, 150);
             }
         }, 60000);
     }
@@ -121,8 +101,9 @@
             clearInterval(strobeInterval);
             strobeInterval = null;
         }
-        // Возвращаем нормальное состояние
-        if (!bodyEl.classList.contains('show-mode')) {
+        isStrobeOn = false;
+        // Возвращаем нормальный вид
+        if (!isShowMode) {
             bodyEl.style.backgroundColor = '';
             bodyEl.style.backgroundImage = '';
             bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
@@ -133,43 +114,48 @@
         }
     }
     
-    // ЗАПУСК СТРОБОСКОПА (мигает белым и чёрным)
+    // ЗАПУСК СТРОБОСКОПА (мигает)
     function startStrobe() {
-        stopStrobe(); // Останавливаем предыдущий режим
-        // Убираем градиент и анимацию
+        // Сначала останавливаем текущий
+        if (strobeInterval) {
+            clearInterval(strobeInterval);
+            strobeInterval = null;
+        }
+        // Убираем градиент
         bodyEl.style.backgroundImage = 'none';
         bodyEl.style.animation = 'none';
+        
         let isWhite = true;
         strobeInterval = setInterval(() => {
             bodyEl.style.backgroundColor = isWhite ? '#ffffff' : '#000000';
             isWhite = !isWhite;
-        }, 100); // 10 раз в секунду
+        }, 100);
+        isStrobeOn = true;
     }
     
-    // РЕЖИМ "НАЧИНАЕМ" (убираем текст, градиент, полупрозрачный фон)
+    // РЕЖИМ "НАЧИНАЕМ"
     function startShow() {
-        textVisible = false;
+        isShowMode = true;
         messageEl.classList.add('hidden');
-        bodyEl.classList.add('show-mode');
-        stopStrobe(); // Если стробоскоп был включён — выключаем
+        stopStrobe();
         bodyEl.style.backgroundColor = '#0a1a3a';
         bodyEl.style.backgroundImage = 'none';
         bodyEl.style.animation = 'none';
     }
     
-    // РЕЖИМ "СПАСИБО" (показываем текст, возвращаем градиент)
+    // РЕЖИМ "СПАСИБО"
     function showThankYou() {
-        textVisible = true;
+        isShowMode = false;
         messageEl.classList.remove('hidden');
-        bodyEl.classList.remove('show-mode');
         messageEl.innerText = "❤️ СПАСИБО ЗА НЕВЕРОЯТНЫЕ ЭМОЦИИ ❤️";
+        stopStrobe();
         bodyEl.style.backgroundColor = '';
         bodyEl.style.backgroundImage = '';
         bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
         setTimeout(() => {
-            if (textVisible && !bodyEl.classList.contains('show-mode')) {
+            if (!isShowMode) {
                 currentIndex = 0;
-                updateMessage();
+                messageEl.innerText = messages[currentIndex];
                 startAutoSwitch();
             }
         }, 5000);
@@ -179,39 +165,33 @@
     socket.emit('iam-guest');
     
     socket.on('connect', () => {
-        console.log('✅ Гость: подключено к серверу');
+        console.log('✅ Подключено');
         socket.emit('iam-guest');
         startAutoSwitch();
     });
     
     socket.on('guest-confirmed', () => {
-        console.log('✅ Гость зарегистрирован');
+        console.log('✅ Зарегистрирован');
     });
     
     socket.on('start-show', () => {
-        console.log('🎬 Получена команда: start-show');
+        console.log('🎬 start-show');
         startShow();
     });
     
     socket.on('thank-you', () => {
-        console.log('❤️ Получена команда: thank-you');
+        console.log('❤️ thank-you');
         showThankYou();
     });
     
-    // ЦВЕТА УБРАНЫ — ничего не делаем
-    socket.on('color-change', (color) => {
-        console.log('🎨 Цвет получен, но отключён:', color);
-        // Ничего не делаем
-    });
-    
-    // СТРОБОСКОП — РАБОТАЕТ
+    // СТРОБОСКОП — ПРЯМЫЕ КОМАНДЫ
     socket.on('strobe-start', () => {
-        console.log('⚡ Получена команда: strobe-start');
+        console.log('⚡ strobe-start');
         startStrobe();
     });
     
     socket.on('strobe-stop', () => {
-        console.log('⚡ Получена команда: strobe-stop');
+        console.log('⚡ strobe-stop');
         stopStrobe();
     });
 </script>
