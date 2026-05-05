@@ -22,6 +22,7 @@
             color: rgba(255, 255, 255, 0.95);
             padding: 2rem;
             transition: background-color 0.05s linear;
+            margin: 0;
         }
         @keyframes gradientShift {
             0% { background: linear-gradient(135deg, #0a1a3a, #1a2a4a); }
@@ -35,6 +36,13 @@
             border-radius: 3rem;
             padding: 2rem;
             text-align: center;
+            transition: all 0.3s ease;
+        }
+        /* Когда шоу началось — убираем полупрозрачный фон и blur */
+        body.show-mode .container {
+            background: transparent !important;
+            backdrop-filter: none !important;
+            padding: 0 !important;
         }
         .message-text {
             font-size: clamp(1.8rem, 7vw, 3rem);
@@ -53,6 +61,10 @@
             left: 0;
             right: 0;
             text-align: center;
+            transition: opacity 0.3s;
+        }
+        body.show-mode .footer-tip {
+            opacity: 0.2;
         }
     </style>
 </head>
@@ -66,7 +78,6 @@
 <script>
     const socket = io();
     
-    // Фразы для автосмены (только до команды start-show)
     const messages = [
         "✨ РГУТИС ЭТО Я, РГУТИС ЭТО МЫ ✨",
         "🎤 НЕ ЗАБУДЬ ГРОМКО ПОДДЕРЖИВАТЬ ВЫСТУПАЮЩИХ 🎤",
@@ -80,9 +91,10 @@
     let strobeInterval = null;
     let textVisible = true;
     const messageEl = document.getElementById('mainMessage');
+    const bodyEl = document.body;
     
     function updateMessage() {
-        if (textVisible && messageEl) {
+        if (textVisible && messageEl && !messageEl.classList.contains('hidden')) {
             messageEl.style.opacity = '0';
             setTimeout(() => {
                 messageEl.innerText = messages[currentIndex];
@@ -94,7 +106,7 @@
     function startAutoSwitch() {
         if (autoInterval) clearInterval(autoInterval);
         autoInterval = setInterval(() => {
-            if (textVisible) {
+            if (textVisible && !bodyEl.classList.contains('show-mode')) {
                 currentIndex = (currentIndex + 1) % messages.length;
                 updateMessage();
             }
@@ -106,19 +118,19 @@
             clearInterval(strobeInterval);
             strobeInterval = null;
         }
-        // Возвращаем градиент, убираем инлайн-стиль
-        document.body.style.backgroundColor = '';
-        document.body.style.backgroundImage = '';
-        document.body.style.animation = 'gradientShift 8s ease infinite alternate';
+        // Возвращаем градиент
+        bodyEl.style.backgroundColor = '';
+        bodyEl.style.backgroundImage = '';
+        bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
     }
     
     function startStrobe() {
         stopStrobe();
-        document.body.style.backgroundImage = 'none';
-        document.body.style.animation = 'none';
+        bodyEl.style.backgroundImage = 'none';
+        bodyEl.style.animation = 'none';
         let isWhite = true;
         strobeInterval = setInterval(() => {
-            document.body.style.backgroundColor = isWhite ? '#ffffff' : '#000000';
+            bodyEl.style.backgroundColor = isWhite ? '#ffffff' : '#000000';
             isWhite = !isWhite;
         }, 80);
     }
@@ -126,20 +138,20 @@
     function startShow() {
         textVisible = false;
         messageEl.classList.add('hidden');
+        bodyEl.classList.add('show-mode'); // убираем полупрозрачный фон
         stopStrobe();
-        // Возвращаем градиент
-        document.body.style.backgroundColor = '';
-        document.body.style.backgroundImage = '';
-        document.body.style.animation = 'gradientShift 8s ease infinite alternate';
+        bodyEl.style.backgroundColor = '';
+        bodyEl.style.backgroundImage = '';
+        bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
     }
     
     function showThankYou() {
         textVisible = true;
         messageEl.classList.remove('hidden');
+        bodyEl.classList.remove('show-mode');
         messageEl.innerText = "❤️ СПАСИБО ЗА НЕВЕРОЯТНЫЕ ЭМОЦИИ ❤️";
-        // Стиль сообщения "спасибо" живёт 5 секунд, потом возвращаем обычный режим
         setTimeout(() => {
-            if (textVisible) {
+            if (textVisible && !bodyEl.classList.contains('show-mode')) {
                 currentIndex = 0;
                 updateMessage();
                 startAutoSwitch();
@@ -173,11 +185,11 @@
     socket.on('color-change', (color) => {
         console.log('🎨 Получен цвет:', color);
         stopStrobe();
-        document.body.style.backgroundColor = color;
+        bodyEl.style.backgroundColor = color;
         setTimeout(() => {
-            if (document.body.style.backgroundColor === color) {
-                document.body.style.backgroundColor = '';
-                document.body.style.animation = 'gradientShift 8s ease infinite alternate';
+            if (bodyEl.style.backgroundColor === color) {
+                bodyEl.style.backgroundColor = '';
+                bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
             }
         }, 400);
     });
