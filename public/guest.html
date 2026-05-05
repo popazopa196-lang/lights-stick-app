@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Lights Stick App — Гость</title>
+    <title>РГУТИС — Световое шоу</title>
     <style>
         * {
             margin: 0;
@@ -12,91 +12,180 @@
             user-select: none;
         }
         body {
-            transition: background-color 0.05s linear;
             min-height: 100vh;
-            background-color: #000000;
             display: flex;
             align-items: center;
             justify-content: center;
             font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0a1a3a, #1a2a4a);
+            animation: gradientShift 8s ease infinite alternate;
+            color: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
+            transition: background-color 0.05s linear;
         }
-        .info {
-            text-align: center;
-            background: rgba(0,0,0,0.6);
-            padding: 12px 24px;
-            border-radius: 60px;
-            color: white;
-            font-size: 1rem;
+        @keyframes gradientShift {
+            0% { background: linear-gradient(135deg, #0a1a3a, #1a2a4a); }
+            50% { background: linear-gradient(135deg, #1a2a5a, #2a3a6a); }
+            100% { background: linear-gradient(135deg, #2a3a6a, #1a2a4a); }
+        }
+        .container {
+            max-width: 90vw;
+            background: rgba(0, 0, 0, 0.25);
             backdrop-filter: blur(8px);
-            pointer-events: none;
+            border-radius: 3rem;
+            padding: 2rem;
+            text-align: center;
         }
-        .footer {
+        .message-text {
+            font-size: clamp(1.5rem, 6vw, 2.5rem);
+            line-height: 1.3;
+            font-weight: 800;
+            transition: opacity 0.3s ease;
+        }
+        .message-text.hidden {
+            display: none;
+        }
+        .status {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+        .footer-tip {
             position: fixed;
             bottom: 16px;
+            font-size: 0.7rem;
+            opacity: 0.5;
             left: 0;
             right: 0;
             text-align: center;
-            font-size: 11px;
-            color: rgba(255,255,255,0.3);
-            pointer-events: none;
+        }
+        .waiting {
+            position: fixed;
+            top: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            background: rgba(0,0,0,0.6);
+            padding: 8px;
+            font-size: 0.8rem;
         }
     </style>
 </head>
 <body>
-<div class="info" id="statusMessage">✨ Lights Stick App — готов</div>
-<div class="footer">цвет и вспышка со сцены</div>
+<div class="container">
+    <div class="message-text" id="mainMessage">💙 РГУТИС ЭТО Я, РГУТИС ЭТО МЫ 💙</div>
+    <div class="status" id="statusMsg">✨ подключение к шоу...</div>
+</div>
+<div class="footer-tip">твой экран — часть шоу</div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
     const socket = io();
-    let flashTimeout = null;
-    let originalColor = '#000000';
-
-    function setColor(color) {
-        if (flashTimeout) clearTimeout(flashTimeout);
+    
+    // Фразы для автосмены
+    const messages = [
+        "✨ РГУТИС ЭТО Я, РГУТИС ЭТО МЫ ✨",
+        "🎤 НЕ ЗАБУДЬ ГРОМКО ПОДДЕРЖИВАТЬ ВЫСТУПАЮЩИХ 🎤",
+        "💫 ТЫ ВЫГЛЯДИШЬ СНОГСШИБАТЕЛЬНО 💫",
+        "😊 ХОРОШЕГО НАСТРОЕНИЯ! 😊",
+        "🚀 МЫ СКОРО НАЧНЕМ 🚀"
+    ];
+    
+    let currentIndex = 0;
+    let autoInterval = null;
+    let strobeInterval = null;
+    let textVisible = true;
+    const messageEl = document.getElementById('mainMessage');
+    const statusEl = document.getElementById('statusMsg');
+    
+    function updateMessage() {
+        if (textVisible && messageEl) {
+            messageEl.style.opacity = '0';
+            setTimeout(() => {
+                messageEl.innerText = messages[currentIndex];
+                messageEl.style.opacity = '1';
+            }, 150);
+        }
+    }
+    
+    function startAutoSwitch() {
+        if (autoInterval) clearInterval(autoInterval);
+        autoInterval = setInterval(() => {
+            if (textVisible) {
+                currentIndex = (currentIndex + 1) % messages.length;
+                updateMessage();
+            }
+        }, 60000);
+    }
+    
+    function stopStrobe() {
+        if (strobeInterval) {
+            clearInterval(strobeInterval);
+            strobeInterval = null;
+        }
+        document.body.style.backgroundColor = '';
+        document.body.style.backgroundImage = '';
+        document.body.style.animation = 'gradientShift 8s ease infinite alternate';
+    }
+    
+    function startStrobe() {
+        stopStrobe();
+        document.body.style.backgroundImage = 'none';
+        document.body.style.animation = 'none';
+        let isWhite = true;
+        strobeInterval = setInterval(() => {
+            document.body.style.backgroundColor = isWhite ? '#ffffff' : '#000000';
+            isWhite = !isWhite;
+        }, 80); // ~12.5 раз в секунду
+    }
+    
+    function hideText() {
+        textVisible = false;
+        messageEl.classList.add('hidden');
+        statusEl.innerHTML = '🎬 ШОУ ИДЁТ! наслаждайся светом';
+    }
+    
+    // Регистрация гостя
+    socket.emit('guest-connect');
+    
+    socket.on('connect', () => {
+        statusEl.innerHTML = '✅ подключено к серверу';
+        socket.emit('guest-connect');
+    });
+    
+    socket.on('guest-connected', () => {
+        console.log('Гость зарегистрирован');
+        statusEl.innerHTML = '✨ ожидаем начала шоу';
+        startAutoSwitch();
+    });
+    
+    socket.on('color-change', (color) => {
+        stopStrobe();
         document.body.style.backgroundColor = color;
-        originalColor = color;
-        document.getElementById('statusMessage').innerHTML = '🎨 режим: цвет со сцены';
-    }
-
-    function flashEffect(durationMs) {
-        if (flashTimeout) clearTimeout(flashTimeout);
-        const body = document.body;
-        const originalBg = body.style.backgroundColor;
-        body.style.backgroundColor = '#ffffff';
-        document.getElementById('statusMessage').innerHTML = '⚡ ВСПЫШКА!';
-
-        // Пытаемся включить фонарик (только на Android + Chrome)
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                .then(stream => {
-                    const track = stream.getVideoTracks()[0];
-                    if (track && track.applyConstraints) {
-                        track.applyConstraints({ advanced: [{ torch: true }] });
-                        setTimeout(() => {
-                            track.applyConstraints({ advanced: [{ torch: false }] });
-                            stream.getTracks().forEach(t => t.stop());
-                        }, durationMs);
-                    } else {
-                        stream.getTracks().forEach(t => t.stop());
-                    }
-                })
-                .catch(e => console.log('Фонарик не поддерживается браузером'));
-        }
-
-        flashTimeout = setTimeout(() => {
-            document.body.style.backgroundColor = originalBg;
-            document.getElementById('statusMessage').innerHTML = '🔆 вспышка завершена';
-            flashTimeout = null;
-        }, durationMs);
-    }
-
-    socket.on('command', (cmd) => {
-        if (cmd.mode === 'color') {
-            setColor(cmd.value);
-        } else if (cmd.mode === 'flash') {
-            flashEffect(cmd.value);
-        }
+        setTimeout(() => {
+            if (document.body.style.backgroundColor === color) {
+                document.body.style.backgroundColor = '';
+                document.body.style.animation = 'gradientShift 8s ease infinite alternate';
+            }
+        }, 400);
+    });
+    
+    socket.on('strobe-start', () => {
+        startStrobe();
+    });
+    
+    socket.on('strobe-stop', () => {
+        stopStrobe();
+    });
+    
+    socket.on('show-start', () => {
+        hideText();
+    });
+    
+    socket.on('host-disconnected', () => {
+        statusEl.innerHTML = '⚠️ организатор отключился';
+        if (autoInterval) clearInterval(autoInterval);
+        stopStrobe();
     });
 </script>
 </body>
