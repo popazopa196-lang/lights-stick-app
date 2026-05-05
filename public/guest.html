@@ -21,12 +21,10 @@
             animation: gradientShift 8s ease infinite alternate;
             color: rgba(255, 255, 255, 0.95);
             padding: 2rem;
-            transition: background-color 0.05s linear;
             margin: 0;
         }
         @keyframes gradientShift {
             0% { background: linear-gradient(135deg, #0a1a3a, #1a2a4a); }
-            50% { background: linear-gradient(135deg, #1a2a5a, #2a3a6a); }
             100% { background: linear-gradient(135deg, #2a3a6a, #1a2a4a); }
         }
         .container {
@@ -38,7 +36,7 @@
             text-align: center;
             transition: all 0.3s ease;
         }
-        /* Когда шоу началось — убираем полупрозрачный фон и blur */
+        /* Режим шоу: убираем фон, blur и текст */
         body.show-mode .container {
             background: transparent !important;
             backdrop-filter: none !important;
@@ -65,7 +63,6 @@
             left: 0;
             right: 0;
             text-align: center;
-            transition: opacity 0.3s;
         }
         body.show-mode .footer-tip {
             opacity: 0.2;
@@ -80,7 +77,6 @@
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
-    // ПОДКЛЮЧАЕМСЯ К ТОМУ ЖЕ СЕРВЕРУ, ОТКУДА ПРИШЛА СТРАНИЦА
     const socket = io();
     
     const messages = [
@@ -98,6 +94,7 @@
     const messageEl = document.getElementById('mainMessage');
     const bodyEl = document.body;
     
+    // Автосмена фраз
     function updateMessage() {
         if (textVisible && messageEl && !messageEl.classList.contains('hidden')) {
             messageEl.style.opacity = '0';
@@ -118,12 +115,13 @@
         }, 60000);
     }
     
+    // ПОЛНАЯ ОСТАНОВКА СТРОБОСКОПА
     function stopStrobe() {
         if (strobeInterval) {
             clearInterval(strobeInterval);
             strobeInterval = null;
         }
-        // Возвращаем градиент, если не в режиме шоу
+        // Возвращаем нормальное состояние
         if (!bodyEl.classList.contains('show-mode')) {
             bodyEl.style.backgroundColor = '';
             bodyEl.style.backgroundImage = '';
@@ -135,27 +133,31 @@
         }
     }
     
+    // ЗАПУСК СТРОБОСКОПА (мигает белым и чёрным)
     function startStrobe() {
-        stopStrobe();
+        stopStrobe(); // Останавливаем предыдущий режим
+        // Убираем градиент и анимацию
         bodyEl.style.backgroundImage = 'none';
         bodyEl.style.animation = 'none';
         let isWhite = true;
         strobeInterval = setInterval(() => {
             bodyEl.style.backgroundColor = isWhite ? '#ffffff' : '#000000';
             isWhite = !isWhite;
-        }, 80);
+        }, 100); // 10 раз в секунду
     }
     
+    // РЕЖИМ "НАЧИНАЕМ" (убираем текст, градиент, полупрозрачный фон)
     function startShow() {
         textVisible = false;
         messageEl.classList.add('hidden');
         bodyEl.classList.add('show-mode');
+        stopStrobe(); // Если стробоскоп был включён — выключаем
         bodyEl.style.backgroundColor = '#0a1a3a';
         bodyEl.style.backgroundImage = 'none';
         bodyEl.style.animation = 'none';
-        stopStrobe();
     }
     
+    // РЕЖИМ "СПАСИБО" (показываем текст, возвращаем градиент)
     function showThankYou() {
         textVisible = true;
         messageEl.classList.remove('hidden');
@@ -196,23 +198,13 @@
         showThankYou();
     });
     
+    // ЦВЕТА УБРАНЫ — ничего не делаем
     socket.on('color-change', (color) => {
-        console.log('🎨 Получен цвет:', color);
-        stopStrobe();
-        bodyEl.style.backgroundColor = color;
-        bodyEl.style.backgroundImage = 'none';
-        bodyEl.style.animation = 'none';
-        setTimeout(() => {
-            if (!bodyEl.classList.contains('show-mode')) {
-                bodyEl.style.backgroundColor = '';
-                bodyEl.style.backgroundImage = '';
-                bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
-            } else {
-                bodyEl.style.backgroundColor = '#0a1a3a';
-            }
-        }, 400);
+        console.log('🎨 Цвет получен, но отключён:', color);
+        // Ничего не делаем
     });
     
+    // СТРОБОСКОП — РАБОТАЕТ
     socket.on('strobe-start', () => {
         console.log('⚡ Получена команда: strobe-start');
         startStrobe();
