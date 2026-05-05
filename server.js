@@ -6,49 +6,48 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  },
+  cors: { origin: "*", methods: ["GET", "POST"] },
   transports: ['websocket', 'polling']
 });
 
-// Раздаём статические файлы из папки public
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Все запросы направляем на guest.html (чтобы не было 404)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'guest.html'));
 });
 
-// Хранилище подключений
 let hostSocket = null;
 const guests = new Set();
+let showModeActive = false;     // Режим шоу (градиент выключен, текст скрыт)
 
 io.on('connection', (socket) => {
   console.log(`🔌 Новое подключение: ${socket.id}`);
 
-  // ---- Хост подключается ----
+  // ---- Хост ----
   socket.on('host-connect', () => {
-    // Если был старый хост — отключаем его
     if (hostSocket && hostSocket !== socket) {
       hostSocket.emit('host-replaced');
     }
     hostSocket = socket;
     socket.isHost = true;
-    console.log('🎬 Хост подключился и зарегистрирован');
+    console.log('🎬 Хост зарегистрирован');
     socket.emit('host-connected', { success: true });
-    // Отправляем текущее количество гостей
     socket.emit('guests-update', guests.size);
+    // Отправляем текущий режим новому хосту (на всякий случай)
+    socket.emit('mode-state', { showModeActive });
   });
 
-  // ---- Гость подключается ----
+  // ---- Гость ----
   socket.on('guest-connect', () => {
     socket.isGuest = true;
     guests.add(socket.id);
     console.log(`👤 Гость подключился. Всего: ${guests.size}`);
-    socket.emit('guest-connected', { success: true });
-    // Уведомляем хоста
+    
+    // Отправляем новому гостю текущее состояние
+    socket.emit('guest-connected', { success: true, showModeActive });
+    if (showModeActive) {
+      socket.emit('show-start');        // Сразу скрываем текст и убираем градиент
+    }
+    
     if (hostSocket) {
       hostSocket.emit('guests-update', guests.size);
     }
@@ -57,7 +56,7 @@ io.on('connection', (socket) => {
   // ---- Команды от хоста ----
   socket.on('set-color', (color) => {
     if (socket.isHost && hostSocket === socket) {
-      console.log(`🎨 Рассылаем цвет: ${color} для ${guests.size} гостей`);
+      console.log(`🎨 Цвет ${color} → ${guests.size} гостей`);
       guests.forEach(guestId => {
         io.to(guestId).emit('color-change', color);
       });
@@ -66,7 +65,7 @@ io.on('connection', (socket) => {
 
   socket.on('strobe-on', () => {
     if (socket.isHost && hostSocket === socket) {
-      console.log(`⚡ Рассылаем: стробоскоп ВКЛ`);
+      console.log(`⚡ Стробоскоп ВКЛ`);
       guests.forEach(guestId => {
         io.to(guestId).emit('strobe-start');
       });
@@ -75,7 +74,7 @@ io.on('connection', (socket) => {
 
   socket.on('strobe-off', () => {
     if (socket.isHost && hostSocket === socket) {
-      console.log(`⚡ Рассылаем: стробоскоп ВЫКЛ`);
+      console.log(`⚡ Стробоскоп ВЫКЛ`);
       guests.forEach(guestId => {
         io.to(guestId).emit('strobe-stop');
       });
@@ -84,9 +83,20 @@ io.on('connection', (socket) => {
 
   socket.on('start-show', () => {
     if (socket.isHost && hostSocket === socket) {
-      console.log(`🎬 Рассылаем: начать шоу (скрыть текст)`);
+      showModeActive = true;
+      console.log(`🎬 Режим шоу АКТИВИРОВАН (градиент и текст выключены)`);
       guests.forEach(guestId => {
         io.to(guestId).emit('show-start');
+      });
+    }
+  });
+
+  // Новая кнопка "Спасибо"
+  socket.on('show-thankyou', () => {
+    if (socket.isHost && hostSocket === socket) {
+      console.log(`💖 Показываем "Спасибо" на 5 секунд`);
+      guests.forEach(guestId => {
+        io.to(guestId).emit('show-thankyou');
       });
     }
   });
@@ -94,16 +104,14 @@ io.on('connection', (socket) => {
   // ---- Отключение ----
   socket.on('disconnect', () => {
     console.log(`❌ Отключился: ${socket.id}`);
-    
     if (socket.isHost && hostSocket === socket) {
       hostSocket = null;
-      console.log('🏁 Хост отключился');
-      // Уведомляем гостей
+      showModeActive = false;
+      console.log('🏁 Хост отключился, сбрасываем режим');
       guests.forEach(guestId => {
         io.to(guestId).emit('host-disconnected');
       });
     }
-    
     if (socket.isGuest) {
       guests.delete(socket.id);
       console.log(`👋 Гость отключился. Осталось: ${guests.size}`);
@@ -114,10 +122,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// Запуск сервера
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Сервер успешно запущен на порту ${PORT}`);
-  console.log(`🌐 Страница хоста: http://localhost:${PORT}/host.html`);
-  console.log(`🌐 Страница гостя: http://localhost:${PORT}/guest.html`);
+  console.log(`🚀 Сервер запущен на порту ${PORT}`);
 });
