@@ -71,24 +71,6 @@
         }
         .start-btn { background: #00c853; }
         .thank-btn { background: #ff3b30; }
-        .color-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin: 20px 0;
-        }
-        .color-btn {
-            border: none;
-            border-radius: 60px;
-            padding: 14px 0;
-            font-weight: bold;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: transform 0.05s;
-        }
-        .color-btn:active {
-            transform: scale(0.96);
-        }
         .strobe-btn {
             background: #ff2d55;
             border: none;
@@ -138,6 +120,10 @@
             color: white;
             animation: pulse 1s infinite;
         }
+        hr {
+            margin: 20px 0;
+            border-color: #2a3a50;
+        }
     </style>
 </head>
 <body>
@@ -157,13 +143,7 @@
     <button class="main-btn start-btn" id="startShowBtn">🎬 НАЧИНАЕМ (убрать текст и градиент)</button>
     <button class="main-btn thank-btn" id="thankYouBtn">❤️ СКАЗАТЬ СПАСИБО</button>
 
-    <div class="color-grid">
-        <button class="color-btn" style="background:#ff3b30;" data-color="#ff3b30">🔴 КРАСНЫЙ</button>
-        <button class="color-btn" style="background:#34c759;" data-color="#34c759">🟢 ЗЕЛЁНЫЙ</button>
-        <button class="color-btn" style="background:#007aff;" data-color="#007aff">🔵 СИНИЙ</button>
-        <button class="color-btn" style="background:#af52de;" data-color="#af52de">🟣 ФИОЛЕТ</button>
-        <button class="color-btn" style="background:#ffffff;" data-color="#ffffff">⬜ БЕЛЫЙ</button>
-    </div>
+    <hr>
 
     <button class="strobe-btn" id="strobeBtn">⚡ СТРОБОСКОП</button>
 
@@ -185,20 +165,6 @@
     // Регистрация хоста
     socket.emit('iam-host');
     
-    function sendColor(color) {
-        if (isStrobeActive) {
-            socket.emit('strobe-off');
-            isStrobeActive = false;
-            document.getElementById('strobeBtn').classList.remove('active');
-            document.getElementById('connectionStatus').classList.remove('strobe');
-            setTimeout(() => {
-                socket.emit('set-color', color);
-            }, 50);
-        } else {
-            socket.emit('set-color', color);
-        }
-    }
-    
     function toggleStrobe() {
         if (isStrobeActive) {
             socket.emit('strobe-off');
@@ -216,9 +182,6 @@
     }
     
     // Обработчики кнопок
-    document.querySelectorAll('.color-btn').forEach(btn => {
-        btn.addEventListener('click', () => sendColor(btn.getAttribute('data-color')));
-    });
     document.getElementById('strobeBtn').addEventListener('click', toggleStrobe);
     document.getElementById('startShowBtn').addEventListener('click', () => {
         socket.emit('start-show');
