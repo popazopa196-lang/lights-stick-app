@@ -5,12 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Lights Stick App — Пульт</title>
     <style>
-        * {
-            box-sizing: border-box;
-            user-select: none;
-        }
+        * { box-sizing: border-box; user-select: none; }
         body {
-            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            font-family: system-ui, sans-serif;
             background: #0a0f1e;
             margin: 0;
             padding: 16px;
@@ -26,20 +23,9 @@
             border-radius: 48px;
             padding: 24px 20px;
             text-align: center;
-            box-shadow: 0 20px 35px rgba(0,0,0,0.5);
         }
-        h1 {
-            font-size: 1.8rem;
-            margin: 0 0 8px;
-            background: linear-gradient(135deg, #aaccff, #ffffff);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-        }
-        .sub {
-            color: #8e9aaf;
-            margin-bottom: 20px;
-        }
+        h1 { font-size: 1.8rem; margin-bottom: 8px; }
+        .sub { color: #8e9aaf; margin-bottom: 20px; }
         .info-box {
             background: #0c1018;
             border-radius: 32px;
@@ -58,17 +44,25 @@
             background: #00c853;
             border: none;
             border-radius: 60px;
-            padding: 16px;
-            font-size: 1.3rem;
+            padding: 14px;
+            font-size: 1.2rem;
             font-weight: bold;
             color: white;
             width: 100%;
             cursor: pointer;
-            margin: 16px 0;
-            transition: transform 0.05s;
+            margin: 12px 0;
         }
-        .start-btn:active {
-            transform: scale(0.98);
+        .thankyou-btn {
+            background: #ff9500;
+            border: none;
+            border-radius: 60px;
+            padding: 14px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+            width: 100%;
+            cursor: pointer;
+            margin: 12px 0;
         }
         .color-grid {
             display: grid;
@@ -83,23 +77,18 @@
             font-weight: bold;
             font-size: 1rem;
             cursor: pointer;
-            transition: transform 0.05s;
-        }
-        .color-btn:active {
-            transform: scale(0.96);
         }
         .strobe-btn {
             background: #ff2d55;
             border: none;
             border-radius: 60px;
-            padding: 16px;
-            font-size: 1.3rem;
+            padding: 14px;
+            font-size: 1.2rem;
             font-weight: bold;
             color: white;
             width: 100%;
             cursor: pointer;
-            margin: 16px 0;
-            transition: all 0.1s;
+            margin: 12px 0;
         }
         .strobe-btn.active {
             background: #ff0a3a;
@@ -115,7 +104,6 @@
             border-radius: 60px;
             padding: 14px;
             margin-top: 16px;
-            font-size: 1.1rem;
             font-weight: bold;
         }
         .status {
@@ -124,19 +112,9 @@
             border-radius: 28px;
             font-size: 0.85rem;
         }
-        .status.connected {
-            background: #1e3a2f;
-            color: #4cff9e;
-        }
-        .status.disconnected {
-            background: #3a1e1e;
-            color: #ff6b6b;
-        }
-        .status.strobe {
-            background: #ff2d55;
-            color: white;
-            animation: pulse 1s infinite;
-        }
+        .status.connected { background: #1e3a2f; color: #4cff9e; }
+        .status.disconnected { background: #3a1e1e; color: #ff6b6b; }
+        .status.strobe { background: #ff2d55; animation: pulse 1s infinite; }
     </style>
 </head>
 <body>
@@ -147,13 +125,11 @@
     <div class="info-box">
         <div>🔗 Ссылка для гостей:</div>
         <div class="guest-url" id="guestUrlDisplay">Загрузка...</div>
-        <div style="font-size: 0.7rem; margin-top: 8px;">
-            📱 Гости открывают эту ссылку в браузере<br>
-            (работает через мобильный интернет)
-        </div>
+        <div style="font-size: 0.7rem; margin-top: 8px;">📱 Гости открывают в браузере (работает через мобильный интернет)</div>
     </div>
 
-    <button class="start-btn" id="startShowBtn">🎬 НАЧИНАЕМ (убрать текст)</button>
+    <button class="start-btn" id="startShowBtn">🎬 НАЧИНАЕМ (убрать текст и градиент)</button>
+    <button class="thankyou-btn" id="thankyouBtn">💖 СКАЗАТЬ СПАСИБО</button>
 
     <div class="color-grid">
         <button class="color-btn" style="background:#ff3b30;" data-color="#ff3b30">🔴 КРАСНЫЙ</button>
@@ -166,13 +142,8 @@
 
     <button class="strobe-btn" id="strobeBtn">⚡ СТРОБОСКОП</button>
 
-    <div class="counter">
-        📱 Гостей в зале: <span id="guestCount">0</span>
-    </div>
+    <div class="counter">📱 Гостей в зале: <span id="guestCount">0</span></div>
     <div id="connectionStatus" class="status disconnected">⚡ Подключение к серверу...</div>
-    <div style="font-size: 11px; margin-top: 16px; opacity: 0.6;">
-        Нажмите на любой цвет — стробоскоп выключится автоматически
-    </div>
 </div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -180,23 +151,18 @@
     const socket = io();
     let isStrobeActive = false;
     
-    // Отображаем ссылку для гостей
     const guestUrl = window.location.origin + '/guest.html';
     document.getElementById('guestUrlDisplay').innerText = guestUrl;
     
-    // Регистрация хоста
     socket.emit('host-connect');
     
-    // Команды
     function sendColor(color) {
         if (isStrobeActive) {
             socket.emit('strobe-off');
             isStrobeActive = false;
             document.getElementById('strobeBtn').classList.remove('active');
             document.getElementById('connectionStatus').classList.remove('strobe');
-            setTimeout(() => {
-                socket.emit('set-color', color);
-            }, 50);
+            setTimeout(() => socket.emit('set-color', color), 50);
         } else {
             socket.emit('set-color', color);
         }
@@ -208,49 +174,38 @@
             isStrobeActive = false;
             document.getElementById('strobeBtn').classList.remove('active');
             document.getElementById('connectionStatus').classList.remove('strobe');
-            document.getElementById('connectionStatus').innerHTML = '🟢 Подключено к серверу';
+            document.getElementById('connectionStatus').innerHTML = '🟢 Подключено';
         } else {
             socket.emit('strobe-on');
             isStrobeActive = true;
             document.getElementById('strobeBtn').classList.add('active');
             document.getElementById('connectionStatus').classList.add('strobe');
-            document.getElementById('connectionStatus').innerHTML = '⚡ СТРОБОСКОП АКТИВЕН ⚡';
+            document.getElementById('connectionStatus').innerHTML = '⚡ СТРОБОСКОП АКТИВЕН';
         }
     }
     
-    // Обработчики кнопок
     document.querySelectorAll('.color-btn').forEach(btn => {
-        btn.addEventListener('click', () => sendColor(btn.getAttribute('data-color')));
+        btn.addEventListener('click', () => sendColor(btn.dataset.color));
     });
     document.getElementById('strobeBtn').addEventListener('click', toggleStrobe);
-    document.getElementById('startShowBtn').addEventListener('click', () => {
-        socket.emit('start-show');
-    });
+    document.getElementById('startShowBtn').addEventListener('click', () => socket.emit('start-show'));
+    document.getElementById('thankyouBtn').addEventListener('click', () => socket.emit('show-thankyou'));
     
-    // События сокета
     socket.on('connect', () => {
         document.getElementById('connectionStatus').className = 'status connected';
-        document.getElementById('connectionStatus').innerHTML = '🟢 Подключено к серверу';
+        document.getElementById('connectionStatus').innerHTML = '🟢 Подключено';
         socket.emit('host-connect');
     });
-    
     socket.on('connect_error', () => {
         document.getElementById('connectionStatus').className = 'status disconnected';
-        document.getElementById('connectionStatus').innerHTML = '🔴 Ошибка подключения';
+        document.getElementById('connectionStatus').innerHTML = '🔴 Ошибка';
     });
-    
-    socket.on('host-connected', () => {
-        console.log('✅ Хост подтверждён');
-    });
-    
-    socket.on('host-replaced', () => {
-        alert('Внимание! Другой организатор подключился к пульту. Ваше управление отключено.');
-        location.reload();
-    });
-    
     socket.on('guests-update', (count) => {
         document.getElementById('guestCount').innerText = count;
-        console.log('👥 Гостей в зале:', count);
+    });
+    socket.on('host-replaced', () => {
+        alert('Другой организатор подключился к пульту');
+        location.reload();
     });
 </script>
 </body>
