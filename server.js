@@ -11,112 +11,100 @@ const io = socketIo(server, {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'guest.html'));
 });
 
-let hostSocket = null;
-const guests = new Set();
-let showModeActive = false;     // Режим шоу (градиент выключен, текст скрыт)
+// Хранилище всех подключённых клиентов
+const clients = new Set();
 
 io.on('connection', (socket) => {
-  console.log(`🔌 Новое подключение: ${socket.id}`);
+  console.log(`🔌 Клиент подключился: ${socket.id}`);
+  clients.add(socket);
 
-  // ---- Хост ----
-  socket.on('host-connect', () => {
-    if (hostSocket && hostSocket !== socket) {
-      hostSocket.emit('host-replaced');
-    }
-    hostSocket = socket;
+  // Сообщаем новому клиенту его ID (необязательно)
+  socket.emit('welcome', { id: socket.id });
+
+  // Клиент сам сообщает, кто он: хост или гость
+  socket.on('iam-host', () => {
     socket.isHost = true;
-    console.log('🎬 Хост зарегистрирован');
-    socket.emit('host-connected', { success: true });
-    socket.emit('guests-update', guests.size);
-    // Отправляем текущий режим новому хосту (на всякий случай)
-    socket.emit('mode-state', { showModeActive });
+    console.log('🎬 Хост подключился');
+    socket.emit('host-confirmed');
+    // Отправляем хосту количество гостей
+    const guestCount = [...clients].filter(c => !c.isHost).length;
+    socket.emit('guests-count', guestCount);
   });
 
-  // ---- Гость ----
-  socket.on('guest-connect', () => {
+  socket.on('iam-guest', () => {
     socket.isGuest = true;
-    guests.add(socket.id);
-    console.log(`👤 Гость подключился. Всего: ${guests.size}`);
-    
-    // Отправляем новому гостю текущее состояние
-    socket.emit('guest-connected', { success: true, showModeActive });
-    if (showModeActive) {
-      socket.emit('show-start');        // Сразу скрываем текст и убираем градиент
-    }
-    
-    if (hostSocket) {
-      hostSocket.emit('guests-update', guests.size);
+    console.log('👤 Гость подключился');
+    socket.emit('guest-confirmed');
+    // Уведомляем хоста об изменении количества гостей
+    const hostClient = [...clients].find(c => c.isHost);
+    if (hostClient) {
+      const guestCount = [...clients].filter(c => !c.isHost).length;
+      hostClient.emit('guests-count', guestCount);
     }
   });
 
-  // ---- Команды от хоста ----
+  // --- Команды от хоста (рассылаем всем гостям) ---
+  socket.on('start-show', () => {
+    if (socket.isHost) {
+      console.log('🎬 Рассылаем команду: start-show');
+      [...clients].forEach(client => {
+        if (!client.isHost) client.emit('start-show');
+      });
+    }
+  });
+
+  socket.on('thank-you', () => {
+    if (socket.isHost) {
+      console.log('❤️ Рассылаем команду: thank-you');
+      [...clients].forEach(client => {
+        if (!client.isHost) client.emit('thank-you');
+      });
+    }
+  });
+
   socket.on('set-color', (color) => {
-    if (socket.isHost && hostSocket === socket) {
-      console.log(`🎨 Цвет ${color} → ${guests.size} гостей`);
-      guests.forEach(guestId => {
-        io.to(guestId).emit('color-change', color);
+    if (socket.isHost) {
+      console.log(`🎨 Рассылаем цвет: ${color}`);
+      [...clients].forEach(client => {
+        if (!client.isHost) client.emit('color-change', color);
       });
     }
   });
 
   socket.on('strobe-on', () => {
-    if (socket.isHost && hostSocket === socket) {
-      console.log(`⚡ Стробоскоп ВКЛ`);
-      guests.forEach(guestId => {
-        io.to(guestId).emit('strobe-start');
+    if (socket.isHost) {
+      console.log('⚡ Рассылаем: strobe-on');
+      [...clients].forEach(client => {
+        if (!client.isHost) client.emit('strobe-start');
       });
     }
   });
 
   socket.on('strobe-off', () => {
-    if (socket.isHost && hostSocket === socket) {
-      console.log(`⚡ Стробоскоп ВЫКЛ`);
-      guests.forEach(guestId => {
-        io.to(guestId).emit('strobe-stop');
+    if (socket.isHost) {
+      console.log('⚡ Рассылаем: strobe-off');
+      [...clients].forEach(client => {
+        if (!client.isHost) client.emit('strobe-stop');
       });
     }
   });
 
-  socket.on('start-show', () => {
-    if (socket.isHost && hostSocket === socket) {
-      showModeActive = true;
-      console.log(`🎬 Режим шоу АКТИВИРОВАН (градиент и текст выключены)`);
-      guests.forEach(guestId => {
-        io.to(guestId).emit('show-start');
-      });
-    }
-  });
-
-  // Новая кнопка "Спасибо"
-  socket.on('show-thankyou', () => {
-    if (socket.isHost && hostSocket === socket) {
-      console.log(`💖 Показываем "Спасибо" на 5 секунд`);
-      guests.forEach(guestId => {
-        io.to(guestId).emit('show-thankyou');
-      });
-    }
-  });
-
-  // ---- Отключение ----
+  // --- Отключение ---
   socket.on('disconnect', () => {
-    console.log(`❌ Отключился: ${socket.id}`);
-    if (socket.isHost && hostSocket === socket) {
-      hostSocket = null;
-      showModeActive = false;
-      console.log('🏁 Хост отключился, сбрасываем режим');
-      guests.forEach(guestId => {
-        io.to(guestId).emit('host-disconnected');
-      });
-    }
-    if (socket.isGuest) {
-      guests.delete(socket.id);
-      console.log(`👋 Гость отключился. Осталось: ${guests.size}`);
-      if (hostSocket) {
-        hostSocket.emit('guests-update', guests.size);
+    console.log(`❌ Клиент отключился: ${socket.id}`);
+    clients.delete(socket);
+    if (socket.isHost) {
+      console.log('🏁 Хост отключился');
+    } else if (socket.isGuest) {
+      const hostClient = [...clients].find(c => c.isHost);
+      if (hostClient) {
+        const guestCount = [...clients].filter(c => !c.isHost).length;
+        hostClient.emit('guests-count', guestCount);
       }
     }
   });
@@ -125,4 +113,6 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Сервер запущен на порту ${PORT}`);
+  console.log(`🌐 Хост: https://lights-stick-app-production.up.railway.app/host.html`);
+  console.log(`🌐 Гость: https://lights-stick-app-production.up.railway.app/guest.html`);
 });
