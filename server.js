@@ -6,81 +6,118 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  },
+  transports: ['websocket', 'polling']
 });
 
+// Раздаём статические файлы из папки public
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Все запросы направляем на guest.html (чтобы не было 404)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'guest.html'));
 });
 
-const rooms = new Map();
+// Хранилище подключений
+let hostSocket = null;
+const guests = new Set();
 
 io.on('connection', (socket) => {
-  console.log(`✅ Подключился: ${socket.id}`);
+  console.log(`🔌 Новое подключение: ${socket.id}`);
 
-  // Хост создаёт комнату
-  socket.on('host-register', (code) => {
-    socket.hostCode = code;
-    rooms.set(code, { host: socket.id, guests: [] });
-    console.log(`🏠 Комната ${code} создана`);
-    socket.emit('registered');
+  // ---- Хост подключается ----
+  socket.on('host-connect', () => {
+    // Если был старый хост — отключаем его
+    if (hostSocket && hostSocket !== socket) {
+      hostSocket.emit('host-replaced');
+    }
+    hostSocket = socket;
+    socket.isHost = true;
+    console.log('🎬 Хост подключился и зарегистрирован');
+    socket.emit('host-connected', { success: true });
+    // Отправляем текущее количество гостей
+    socket.emit('guests-update', guests.size);
   });
 
-  // Гость подключается
-  socket.on('guest-join', (code) => {
-    const room = rooms.get(code);
-    if (room && room.host) {
-      room.guests.push(socket.id);
-      socket.join(`room-${code}`);
-      socket.emit('join-success');
-      io.to(room.host).emit('guest-count', room.guests.length);
-      console.log(`👤 Гость в ${code}, всего: ${room.guests.length}`);
-    } else {
-      socket.emit('join-error');
+  // ---- Гость подключается ----
+  socket.on('guest-connect', () => {
+    socket.isGuest = true;
+    guests.add(socket.id);
+    console.log(`👤 Гость подключился. Всего: ${guests.size}`);
+    socket.emit('guest-connected', { success: true });
+    // Уведомляем хоста
+    if (hostSocket) {
+      hostSocket.emit('guests-update', guests.size);
     }
   });
 
-  // Цвет от хоста
-  socket.on('color-command', ({ code, color }) => {
-    const room = rooms.get(code);
-    if (room && room.host === socket.id) {
-      io.to(`room-${code}`).emit('set-color', color);
-      console.log(`🎨 Цвет ${color} в ${code}`);
+  // ---- Команды от хоста ----
+  socket.on('set-color', (color) => {
+    if (socket.isHost && hostSocket === socket) {
+      console.log(`🎨 Рассылаем цвет: ${color} для ${guests.size} гостей`);
+      guests.forEach(guestId => {
+        io.to(guestId).emit('color-change', color);
+      });
     }
   });
 
-  // Стробоскоп
-  socket.on('strobe-command', ({ code, active }) => {
-    const room = rooms.get(code);
-    if (room && room.host === socket.id) {
-      io.to(`room-${code}`).emit('set-strobe', active);
-      console.log(`⚡ Стробоскоп ${active ? 'ВКЛ' : 'ВЫКЛ'} в ${code}`);
+  socket.on('strobe-on', () => {
+    if (socket.isHost && hostSocket === socket) {
+      console.log(`⚡ Рассылаем: стробоскоп ВКЛ`);
+      guests.forEach(guestId => {
+        io.to(guestId).emit('strobe-start');
+      });
     }
   });
 
-  // Начать шоу
-  socket.on('start-show-command', (code) => {
-    const room = rooms.get(code);
-    if (room && room.host === socket.id) {
-      io.to(`room-${code}`).emit('start-show');
-      console.log(`🎬 Шоу началось в ${code}`);
+  socket.on('strobe-off', () => {
+    if (socket.isHost && hostSocket === socket) {
+      console.log(`⚡ Рассылаем: стробоскоп ВЫКЛ`);
+      guests.forEach(guestId => {
+        io.to(guestId).emit('strobe-stop');
+      });
     }
   });
 
+  socket.on('start-show', () => {
+    if (socket.isHost && hostSocket === socket) {
+      console.log(`🎬 Рассылаем: начать шоу (скрыть текст)`);
+      guests.forEach(guestId => {
+        io.to(guestId).emit('show-start');
+      });
+    }
+  });
+
+  // ---- Отключение ----
   socket.on('disconnect', () => {
-    for (let [code, room] of rooms.entries()) {
-      if (room.host === socket.id) {
-        rooms.delete(code);
-        console.log(`🏚️ Комната ${code} закрыта`);
-        break;
+    console.log(`❌ Отключился: ${socket.id}`);
+    
+    if (socket.isHost && hostSocket === socket) {
+      hostSocket = null;
+      console.log('🏁 Хост отключился');
+      // Уведомляем гостей
+      guests.forEach(guestId => {
+        io.to(guestId).emit('host-disconnected');
+      });
+    }
+    
+    if (socket.isGuest) {
+      guests.delete(socket.id);
+      console.log(`👋 Гость отключился. Осталось: ${guests.size}`);
+      if (hostSocket) {
+        hostSocket.emit('guests-update', guests.size);
       }
     }
   });
 });
 
-const PORT = process.env.PORT || 3000;
+// Запуск сервера
+const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Сервер на порту ${PORT}`);
+  console.log(`🚀 Сервер успешно запущен на порту ${PORT}`);
+  console.log(`🌐 Страница хоста: http://localhost:${PORT}/host.html`);
+  console.log(`🌐 Страница гостя: http://localhost:${PORT}/guest.html`);
 });
