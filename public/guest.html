@@ -5,42 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>РГУТИС — Световое шоу</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            user-select: none;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
         body {
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            font-family: system-ui, sans-serif;
             background: linear-gradient(135deg, #0a1a3a, #1a2a4a);
             animation: gradientShift 8s ease infinite alternate;
-            color: rgba(255, 255, 255, 0.95);
+            color: white;
             padding: 2rem;
             transition: background-color 0.05s linear;
         }
         @keyframes gradientShift {
             0% { background: linear-gradient(135deg, #0a1a3a, #1a2a4a); }
-            50% { background: linear-gradient(135deg, #1a2a5a, #2a3a6a); }
             100% { background: linear-gradient(135deg, #2a3a6a, #1a2a4a); }
+        }
+        body.show-mode {
+            animation: none;
+            background: #000000 !important;
         }
         .container {
             max-width: 90vw;
-            background: rgba(0, 0, 0, 0.25);
+            background: rgba(0,0,0,0.25);
             backdrop-filter: blur(8px);
             border-radius: 3rem;
             padding: 2rem;
             text-align: center;
         }
+        body.show-mode .container {
+            background: transparent;
+            backdrop-filter: none;
+        }
         .message-text {
             font-size: clamp(1.5rem, 6vw, 2.5rem);
-            line-height: 1.3;
             font-weight: 800;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.2s;
         }
         .message-text.hidden {
             display: none;
@@ -59,20 +60,6 @@
             right: 0;
             text-align: center;
         }
-
-        /* Режим шоу — градиент выключен, текст скрыт */
-        body.show-mode {
-            animation: none;
-            background: #000000 !important;
-            transition: background-color 0.1s ease;
-        }
-        body.show-mode .message-text {
-            display: none;
-        }
-        body.show-mode .container {
-            background: transparent;
-            backdrop-filter: none;
-        }
     </style>
 </head>
 <body>
@@ -85,60 +72,52 @@
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
     const socket = io();
-    
-    // Фразы для автосмены
     const messages = [
         "✨ РГУТИС ЭТО Я, РГУТИС ЭТО МЫ ✨",
         "🎤 НЕ ЗАБУДЬ ГРОМКО ПОДДЕРЖИВАТЬ ВЫСТУПАЮЩИХ 🎤",
         "💫 ТЫ ВЫГЛЯДИШЬ СНОГСШИБАТЕЛЬНО 💫",
         "😊 ХОРОШЕГО НАСТРОЕНИЯ! 😊",
-        "🚀 МЫ СКОРО НАЧНЕМ 🚀",
-        "💖 СПАСИБО ЗА НЕВЕРОЯТНЫЕ ЭМОЦИИ 💖"
+        "🚀 МЫ СКОРО НАЧНЕМ 🚀"
     ];
     
     let currentIndex = 0;
     let autoInterval = null;
     let strobeInterval = null;
-    let isShowMode = false;      // режим шоу (текст скрыт, градиент выключен)
-    let currentColor = null;     // текущий цвет, установленный хостом
+    let thankYouTimeout = null;
+    let isShowMode = false;
+    let currentColor = null;
     
     const messageEl = document.getElementById('mainMessage');
     const statusEl = document.getElementById('statusMsg');
     const bodyEl = document.body;
     
     function updateMessage() {
-        if (!isShowMode && messageEl) {
+        if (!isShowMode && messageEl && !messageEl.classList.contains('hidden')) {
             messageEl.style.opacity = '0';
             setTimeout(() => {
                 messageEl.innerText = messages[currentIndex];
                 messageEl.style.opacity = '1';
-            }, 150);
+            }, 120);
         }
     }
     
     function startAutoSwitch() {
         if (autoInterval) clearInterval(autoInterval);
         autoInterval = setInterval(() => {
-            if (!isShowMode) {
+            if (!isShowMode && !thankYouTimeout) {
                 currentIndex = (currentIndex + 1) % messages.length;
                 updateMessage();
             }
         }, 60000);
     }
     
-    // Остановка стробоскопа
     function stopStrobe() {
         if (strobeInterval) {
             clearInterval(strobeInterval);
             strobeInterval = null;
         }
-        // Восстанавливаем цвет после стробоскопа
         if (isShowMode) {
-            if (currentColor) {
-                bodyEl.style.backgroundColor = currentColor;
-            } else {
-                bodyEl.style.backgroundColor = '#000000';
-            }
+            bodyEl.style.backgroundColor = currentColor || '#000000';
         } else {
             bodyEl.style.backgroundColor = '';
             bodyEl.style.backgroundImage = '';
@@ -146,40 +125,21 @@
         }
     }
     
-    // Запуск стробоскопа
     function startStrobe() {
-        stopStrobe();
-        // Убираем всё лишнее
+        if (strobeInterval) stopStrobe();
         bodyEl.style.backgroundImage = 'none';
         bodyEl.style.animation = 'none';
-        let isWhite = true;
+        let white = true;
         strobeInterval = setInterval(() => {
-            bodyEl.style.backgroundColor = isWhite ? '#ffffff' : '#000000';
-            isWhite = !isWhite;
+            bodyEl.style.backgroundColor = white ? '#ffffff' : '#000000';
+            white = !white;
         }, 80);
     }
     
-    // Переход в режим шоу (убираем текст, выключаем градиент)
-    function enterShowMode() {
-        isShowMode = true;
-        bodyEl.classList.add('show-mode');
-        // Убираем градиент и ставим чёрный фон
-        bodyEl.style.backgroundImage = 'none';
-        bodyEl.style.animation = 'none';
-        bodyEl.style.backgroundColor = '#000000';
-        currentColor = '#000000';
-        statusEl.innerHTML = '🎬 ШОУ ИДЁТ! наслаждайся светом';
-    }
-    
-    // Смена цвета от хоста
     function setColor(color) {
-        // Останавливаем стробоскоп, если был
-        if (strobeInterval) {
-            stopStrobe();
-        }
+        if (strobeInterval) stopStrobe();
         currentColor = color;
         bodyEl.style.backgroundColor = color;
-        // Если не в режиме шоу — возвращаем градиент через 0.4 сек
         if (!isShowMode) {
             setTimeout(() => {
                 if (!isShowMode && !strobeInterval && bodyEl.style.backgroundColor === color) {
@@ -187,12 +147,38 @@
                     bodyEl.style.backgroundImage = '';
                     bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
                 }
-            }, 400);
+            }, 300);
         }
-        console.log('🎨 Цвет применён:', color);
     }
     
-    // Регистрация гостя
+    function showThankYou() {
+        if (thankYouTimeout) clearTimeout(thankYouTimeout);
+        const originalText = messageEl.innerText;
+        const wasHidden = messageEl.classList.contains('hidden');
+        messageEl.classList.remove('hidden');
+        messageEl.innerText = "💖 СПАСИБО ЗА НЕВЕРОЯТНЫЕ ЭМОЦИИ 💖";
+        thankYouTimeout = setTimeout(() => {
+            if (!isShowMode) {
+                messageEl.innerText = originalText;
+                if (wasHidden) messageEl.classList.add('hidden');
+            }
+            thankYouTimeout = null;
+        }, 5000);
+    }
+    
+    function enterShowMode() {
+        isShowMode = true;
+        bodyEl.classList.add('show-mode');
+        bodyEl.style.backgroundImage = 'none';
+        bodyEl.style.animation = 'none';
+        bodyEl.style.backgroundColor = '#000000';
+        currentColor = '#000000';
+        messageEl.classList.add('hidden');
+        statusEl.innerHTML = '🎬 ШОУ ИДЁТ!';
+        if (autoInterval) clearInterval(autoInterval);
+        if (thankYouTimeout) clearTimeout(thankYouTimeout);
+    }
+    
     socket.emit('guest-connect');
     
     socket.on('connect', () => {
@@ -200,33 +186,20 @@
         socket.emit('guest-connect');
     });
     
-    socket.on('guest-connected', () => {
-        console.log('👤 Гость зарегистрирован');
-        statusEl.innerHTML = '✨ ожидаем начала шоу';
-        startAutoSwitch();
+    socket.on('guest-connected', (data) => {
+        console.log('👤 Гость зарегистрирован, showMode =', data.showModeActive);
+        if (data.showModeActive) {
+            enterShowMode();
+        } else {
+            startAutoSwitch();
+        }
     });
     
-    // Приём цвета от хоста
-    socket.on('color-change', (color) => {
-        console.log('🎨 Получен цвет от хоста:', color);
-        setColor(color);
-    });
-    
-    socket.on('strobe-start', () => {
-        console.log('⚡ Стробоскоп включён');
-        startStrobe();
-    });
-    
-    socket.on('strobe-stop', () => {
-        console.log('⚡ Стробоскоп выключен');
-        stopStrobe();
-    });
-    
-    socket.on('show-start', () => {
-        console.log('🎬 Режим шоу активирован');
-        enterShowMode();
-    });
-    
+    socket.on('color-change', (color) => setColor(color));
+    socket.on('strobe-start', () => startStrobe());
+    socket.on('strobe-stop', () => stopStrobe());
+    socket.on('show-start', () => enterShowMode());
+    socket.on('show-thankyou', () => showThankYou());
     socket.on('host-disconnected', () => {
         statusEl.innerHTML = '⚠️ организатор отключился';
         if (autoInterval) clearInterval(autoInterval);
