@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Lights Stick App — Пульт</title>
     <style>
-        * {
-            box-sizing: border-box;
-            user-select: none;
-        }
+        * { box-sizing: border-box; user-select: none; }
         body {
             font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
             background: #0a0f1e;
@@ -20,46 +17,50 @@
             min-height: 100vh;
         }
         .container {
-            max-width: 500px;
+            max-width: 550px;
             width: 100%;
             background: #11161f;
-            border-radius: 40px;
-            padding: 20px;
+            border-radius: 48px;
+            padding: 24px 20px;
             text-align: center;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.5);
         }
         h1 {
-            font-size: 1.6rem;
+            font-size: 1.8rem;
             margin: 0 0 8px;
+            background: linear-gradient(135deg, #aaccff, #ffffff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
         }
-        .room-info {
+        .sub {
+            color: #8e9aaf;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        .room-section {
             background: #0c1018;
-            border-radius: 24px;
+            border-radius: 32px;
             padding: 20px;
+            margin-bottom: 24px;
+        }
+        .room-code {
+            font-size: 3rem;
+            font-weight: bold;
+            letter-spacing: 8px;
+            background: #1e2a3a;
+            padding: 16px;
+            border-radius: 28px;
+            font-family: monospace;
             margin: 16px 0;
         }
         .guest-link {
             background: #00000066;
             padding: 12px;
             border-radius: 60px;
-            font-size: 0.9rem;
+            font-size: 0.7rem;
             word-break: break-all;
-            font-family: monospace;
             margin-bottom: 16px;
-        }
-        .room-code {
-            font-size: 2.5rem;
-            font-weight: bold;
-            letter-spacing: 8px;
-            background: #1e2a3a;
-            padding: 12px;
-            border-radius: 32px;
-            font-family: monospace;
-            margin: 10px 0;
-        }
-        .instruction {
-            font-size: 0.85rem;
-            color: #8e9aaf;
-            margin-top: 12px;
         }
         .color-grid {
             display: grid;
@@ -74,58 +75,73 @@
             font-weight: bold;
             font-size: 1rem;
             cursor: pointer;
-            transition: 0.05s linear;
+            transition: transform 0.05s linear;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
-        .color-btn:active {
-            transform: scale(0.96);
-        }
-        .flash-btn {
-            background: #ff9500;
+        .color-btn:active { transform: scale(0.96); }
+        
+        .strobe-btn {
+            background: #ff2d55;
             border: none;
             border-radius: 60px;
-            padding: 14px;
-            font-size: 1.2rem;
+            padding: 16px;
+            font-size: 1.3rem;
             font-weight: bold;
             color: white;
             width: 100%;
             cursor: pointer;
-            margin-bottom: 20px;
+            margin: 16px 0;
+            transition: all 0.1s ease;
+            box-shadow: 0 4px 12px rgba(255,45,85,0.3);
         }
+        .strobe-btn.active {
+            background: #ff0a3a;
+            box-shadow: 0 0 15px rgba(255,45,85,0.8);
+            animation: pulse 0.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
         .counter {
             background: #00000044;
             border-radius: 60px;
-            padding: 10px;
+            padding: 12px;
             margin-top: 16px;
+            font-size: 1.1rem;
         }
         .refresh-btn {
             background: #2a3a50;
             border: none;
             border-radius: 40px;
-            padding: 8px 16px;
-            margin-top: 10px;
+            padding: 10px 20px;
+            margin-top: 12px;
             color: white;
             cursor: pointer;
         }
+        .status {
+            margin-top: 16px;
+            padding: 10px;
+            border-radius: 28px;
+            font-size: 0.85rem;
+        }
+        .status.connected { background: #1e3a2f; color: #4cff9e; }
+        .status.disconnected { background: #3a1e1e; color: #ff6b6b; }
+        .status.strobe-active { background: #ff2d55; color: white; animation: pulse 1s infinite; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>✨ Lights Stick App</h1>
-    <p>Пульт организатора</p>
+    <div class="sub">Пульт организатора</div>
 
-    <div class="room-info">
-        <div style="margin-bottom: 8px;">🔗 Ссылка для гостей:</div>
-        <div class="guest-link" id="guestUrlDisplay">Загрузка...</div>
-        
-        <div style="margin: 16px 0 8px;">🎫 Код комнаты (введите вручную):</div>
-        <div class="room-code" id="roomCode">1234</div>
-        
-        <div class="instruction">
-            📱 ГОСТИ: откройте в браузере ссылку выше<br>
-            или введите код комнаты на сайте<br>
-            <span style="font-size:0.75rem;">а затем нажмите "Подключиться"</span>
-        </div>
-        <button class="refresh-btn" id="refreshCodeBtn">🔄 Новый код</button>
+    <div class="room-section">
+        <div>🔑 Код вашей комнаты:</div>
+        <div class="room-code" id="roomCode">----</div>
+        <div class="guest-link" id="guestUrlDisplay"></div>
+        <button class="refresh-btn" id="newCodeBtn">🔄 Создать новый код</button>
     </div>
 
     <div class="color-grid">
@@ -137,59 +153,123 @@
         <button class="color-btn" style="background:#ffffff;" data-color="#ffffff">⬜ БЕЛЫЙ</button>
     </div>
 
-    <button class="flash-btn" id="flashBtn">📸 ВСПЫШКА (3 сек)</button>
+    <button class="strobe-btn" id="strobeBtn">⚡ СТРОБОСКОП (мигает белым)</button>
 
     <div class="counter">
         📱 Гостей в зале: <span id="connectedCount">0</span>
     </div>
-    <div style="font-size: 11px; margin-top: 16px;">Гости подключаются по ссылке или коду комнаты</div>
+    <div id="connectionStatus" class="status disconnected">⚫ Ожидание подключения к серверу</div>
+    <div style="font-size: 11px; margin-top: 16px; opacity: 0.6;">
+        Нажмите на любой цвет — стробоскоп выключится автоматически
+    </div>
 </div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
     const socket = io();
+    let currentRoomCode = null;
+    let isStrobeActive = false;
     
-    // Генерация случайного 4-значного кода
     function generateRoomCode() {
         return Math.floor(1000 + Math.random() * 9000).toString();
     }
     
-    let currentRoomCode = generateRoomCode();
+    function updateUI() {
+        if (currentRoomCode) {
+            const guestUrl = window.location.origin + '/guest.html';
+            document.getElementById('roomCode').innerText = currentRoomCode;
+            document.getElementById('guestUrlDisplay').innerHTML = `🔗 Ссылка: ${guestUrl}<br>🎫 Код: ${currentRoomCode}`;
+        }
+    }
     
-    function updateRoomInfo() {
-        const base = window.location.origin;
-        const guestUrl = base + '/guest.html?code=' + currentRoomCode;
-        document.getElementById('guestUrlDisplay').innerText = guestUrl;
-        document.getElementById('roomCode').innerText = currentRoomCode;
+    function createRoom(code) {
+        currentRoomCode = code;
+        socket.emit('host-create-room', { code });
+        updateUI();
+    }
+    
+    function sendColor(color) {
+        if (currentRoomCode) {
+            // Если стробоскоп был включен — выключаем его на сервере
+            if (isStrobeActive) {
+                socket.emit('host-strobe-stop', { code: currentRoomCode });
+                isStrobeActive = false;
+                document.getElementById('strobeBtn').classList.remove('active');
+                document.getElementById('connectionStatus').classList.remove('strobe-active');
+                document.getElementById('connectionStatus').innerHTML = '🟢 Комната активна';
+            }
+            socket.emit('host-color', { code: currentRoomCode, color });
+            console.log('🎨 Отправлен цвет:', color);
+        }
+    }
+    
+    function toggleStrobe() {
+        if (!currentRoomCode) return;
         
-        // Отправляем код на сервер, чтобы гости могли подключиться
-        socket.emit('host-set-room', { code: currentRoomCode });
+        if (isStrobeActive) {
+            // Выключаем стробоскоп
+            socket.emit('host-strobe-stop', { code: currentRoomCode });
+            isStrobeActive = false;
+            document.getElementById('strobeBtn').classList.remove('active');
+            document.getElementById('connectionStatus').classList.remove('strobe-active');
+            document.getElementById('connectionStatus').innerHTML = '🟢 Комната активна';
+            console.log('⚡ Стробоскоп выключен');
+        } else {
+            // Включаем стробоскоп
+            socket.emit('host-strobe-start', { code: currentRoomCode });
+            isStrobeActive = true;
+            document.getElementById('strobeBtn').classList.add('active');
+            document.getElementById('connectionStatus').classList.add('strobe-active');
+            document.getElementById('connectionStatus').innerHTML = '⚡ СТРОБОСКОП АКТИВЕН ⚡';
+            console.log('⚡ Стробоскоп включен');
+        }
     }
     
-    function sendCommand(mode, value) {
-        socket.emit('host-command', { mode, value, roomCode: currentRoomCode });
-    }
-    
+    // Кнопки цветов
     document.querySelectorAll('.color-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            sendCommand('color', btn.getAttribute('data-color'));
+            sendColor(btn.getAttribute('data-color'));
         });
     });
     
-    document.getElementById('flashBtn').addEventListener('click', () => {
-        sendCommand('flash', 3000);
+    // Кнопка стробоскопа
+    document.getElementById('strobeBtn').addEventListener('click', toggleStrobe);
+    
+    // Новая комната
+    document.getElementById('newCodeBtn').addEventListener('click', () => {
+        const newCode = generateRoomCode();
+        createRoom(newCode);
+        // Сбрасываем состояние стробоскопа
+        if (isStrobeActive) {
+            isStrobeActive = false;
+            document.getElementById('strobeBtn').classList.remove('active');
+        }
     });
     
-    document.getElementById('refreshCodeBtn').addEventListener('click', () => {
-        currentRoomCode = generateRoomCode();
-        updateRoomInfo();
+    // Сокет события
+    socket.on('connect', () => {
+        console.log('✅ Подключено к серверу');
+        document.getElementById('connectionStatus').className = 'status connected';
+        document.getElementById('connectionStatus').innerHTML = '🟢 Подключено к серверу';
+        if (!currentRoomCode) {
+            createRoom(generateRoomCode());
+        }
     });
     
-    socket.on('clients-update', (count) => {
+    socket.on('connect_error', () => {
+        document.getElementById('connectionStatus').className = 'status disconnected';
+        document.getElementById('connectionStatus').innerHTML = '🔴 Ошибка подключения к серверу';
+    });
+    
+    socket.on('room-created', ({ code }) => {
+        console.log('✅ Комната создана:', code);
+        document.getElementById('connectionStatus').innerHTML = `🟢 Комната ${code} активна`;
+    });
+    
+    socket.on('guests-count', (count) => {
         document.getElementById('connectedCount').innerText = count;
+        console.log('👥 Гостей стало:', count);
     });
-    
-    updateRoomInfo();
 </script>
 </body>
 </html>
