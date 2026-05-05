@@ -5,51 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>РГУТИС — Световое шоу</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
         body {
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: system-ui, sans-serif;
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #0a1a3a, #1a2a4a);
             animation: gradientShift 8s ease infinite alternate;
-            color: white;
+            color: rgba(255, 255, 255, 0.95);
             padding: 2rem;
             transition: background-color 0.05s linear;
         }
         @keyframes gradientShift {
             0% { background: linear-gradient(135deg, #0a1a3a, #1a2a4a); }
+            50% { background: linear-gradient(135deg, #1a2a5a, #2a3a6a); }
             100% { background: linear-gradient(135deg, #2a3a6a, #1a2a4a); }
-        }
-        body.show-mode {
-            animation: none;
-            background: #000000 !important;
         }
         .container {
             max-width: 90vw;
-            background: rgba(0,0,0,0.25);
+            background: rgba(0, 0, 0, 0.25);
             backdrop-filter: blur(8px);
             border-radius: 3rem;
             padding: 2rem;
             text-align: center;
         }
-        body.show-mode .container {
-            background: transparent;
-            backdrop-filter: none;
-        }
         .message-text {
-            font-size: clamp(1.5rem, 6vw, 2.5rem);
+            font-size: clamp(1.8rem, 7vw, 3rem);
+            line-height: 1.3;
             font-weight: 800;
-            transition: opacity 0.2s;
+            transition: opacity 0.3s ease;
         }
         .message-text.hidden {
             display: none;
-        }
-        .status {
-            margin-top: 20px;
-            font-size: 0.8rem;
-            opacity: 0.7;
         }
         .footer-tip {
             position: fixed;
@@ -65,13 +59,14 @@
 <body>
 <div class="container">
     <div class="message-text" id="mainMessage">💙 РГУТИС ЭТО Я, РГУТИС ЭТО МЫ 💙</div>
-    <div class="status" id="statusMsg">✨ подключение к шоу...</div>
 </div>
 <div class="footer-tip">твой экран — часть шоу</div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
     const socket = io();
+    
+    // Фразы для автосмены (только до команды start-show)
     const messages = [
         "✨ РГУТИС ЭТО Я, РГУТИС ЭТО МЫ ✨",
         "🎤 НЕ ЗАБУДЬ ГРОМКО ПОДДЕРЖИВАТЬ ВЫСТУПАЮЩИХ 🎤",
@@ -83,28 +78,23 @@
     let currentIndex = 0;
     let autoInterval = null;
     let strobeInterval = null;
-    let thankYouTimeout = null;
-    let isShowMode = false;
-    let currentColor = null;
-    
+    let textVisible = true;
     const messageEl = document.getElementById('mainMessage');
-    const statusEl = document.getElementById('statusMsg');
-    const bodyEl = document.body;
     
     function updateMessage() {
-        if (!isShowMode && messageEl && !messageEl.classList.contains('hidden')) {
+        if (textVisible && messageEl) {
             messageEl.style.opacity = '0';
             setTimeout(() => {
                 messageEl.innerText = messages[currentIndex];
                 messageEl.style.opacity = '1';
-            }, 120);
+            }, 150);
         }
     }
     
     function startAutoSwitch() {
         if (autoInterval) clearInterval(autoInterval);
         autoInterval = setInterval(() => {
-            if (!isShowMode && !thankYouTimeout) {
+            if (textVisible) {
                 currentIndex = (currentIndex + 1) % messages.length;
                 updateMessage();
             }
@@ -116,93 +106,89 @@
             clearInterval(strobeInterval);
             strobeInterval = null;
         }
-        if (isShowMode) {
-            bodyEl.style.backgroundColor = currentColor || '#000000';
-        } else {
-            bodyEl.style.backgroundColor = '';
-            bodyEl.style.backgroundImage = '';
-            bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
-        }
+        // Возвращаем градиент, убираем инлайн-стиль
+        document.body.style.backgroundColor = '';
+        document.body.style.backgroundImage = '';
+        document.body.style.animation = 'gradientShift 8s ease infinite alternate';
     }
     
     function startStrobe() {
-        if (strobeInterval) stopStrobe();
-        bodyEl.style.backgroundImage = 'none';
-        bodyEl.style.animation = 'none';
-        let white = true;
+        stopStrobe();
+        document.body.style.backgroundImage = 'none';
+        document.body.style.animation = 'none';
+        let isWhite = true;
         strobeInterval = setInterval(() => {
-            bodyEl.style.backgroundColor = white ? '#ffffff' : '#000000';
-            white = !white;
+            document.body.style.backgroundColor = isWhite ? '#ffffff' : '#000000';
+            isWhite = !isWhite;
         }, 80);
     }
     
-    function setColor(color) {
-        if (strobeInterval) stopStrobe();
-        currentColor = color;
-        bodyEl.style.backgroundColor = color;
-        if (!isShowMode) {
-            setTimeout(() => {
-                if (!isShowMode && !strobeInterval && bodyEl.style.backgroundColor === color) {
-                    bodyEl.style.backgroundColor = '';
-                    bodyEl.style.backgroundImage = '';
-                    bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
-                }
-            }, 300);
-        }
+    function startShow() {
+        textVisible = false;
+        messageEl.classList.add('hidden');
+        stopStrobe();
+        // Возвращаем градиент
+        document.body.style.backgroundColor = '';
+        document.body.style.backgroundImage = '';
+        document.body.style.animation = 'gradientShift 8s ease infinite alternate';
     }
     
     function showThankYou() {
-        if (thankYouTimeout) clearTimeout(thankYouTimeout);
-        const originalText = messageEl.innerText;
-        const wasHidden = messageEl.classList.contains('hidden');
+        textVisible = true;
         messageEl.classList.remove('hidden');
-        messageEl.innerText = "💖 СПАСИБО ЗА НЕВЕРОЯТНЫЕ ЭМОЦИИ 💖";
-        thankYouTimeout = setTimeout(() => {
-            if (!isShowMode) {
-                messageEl.innerText = originalText;
-                if (wasHidden) messageEl.classList.add('hidden');
+        messageEl.innerText = "❤️ СПАСИБО ЗА НЕВЕРОЯТНЫЕ ЭМОЦИИ ❤️";
+        // Стиль сообщения "спасибо" живёт 5 секунд, потом возвращаем обычный режим
+        setTimeout(() => {
+            if (textVisible) {
+                currentIndex = 0;
+                updateMessage();
+                startAutoSwitch();
             }
-            thankYouTimeout = null;
         }, 5000);
     }
     
-    function enterShowMode() {
-        isShowMode = true;
-        bodyEl.classList.add('show-mode');
-        bodyEl.style.backgroundImage = 'none';
-        bodyEl.style.animation = 'none';
-        bodyEl.style.backgroundColor = '#000000';
-        currentColor = '#000000';
-        messageEl.classList.add('hidden');
-        statusEl.innerHTML = '🎬 ШОУ ИДЁТ!';
-        if (autoInterval) clearInterval(autoInterval);
-        if (thankYouTimeout) clearTimeout(thankYouTimeout);
-    }
-    
-    socket.emit('guest-connect');
+    // Регистрация гостя
+    socket.emit('iam-guest');
     
     socket.on('connect', () => {
-        statusEl.innerHTML = '✅ подключено к серверу';
-        socket.emit('guest-connect');
+        console.log('✅ Гость: подключено к серверу');
+        socket.emit('iam-guest');
+        startAutoSwitch();
     });
     
-    socket.on('guest-connected', (data) => {
-        console.log('👤 Гость зарегистрирован, showMode =', data.showModeActive);
-        if (data.showModeActive) {
-            enterShowMode();
-        } else {
-            startAutoSwitch();
-        }
+    socket.on('guest-confirmed', () => {
+        console.log('✅ Гость зарегистрирован');
     });
     
-    socket.on('color-change', (color) => setColor(color));
-    socket.on('strobe-start', () => startStrobe());
-    socket.on('strobe-stop', () => stopStrobe());
-    socket.on('show-start', () => enterShowMode());
-    socket.on('show-thankyou', () => showThankYou());
-    socket.on('host-disconnected', () => {
-        statusEl.innerHTML = '⚠️ организатор отключился';
-        if (autoInterval) clearInterval(autoInterval);
+    socket.on('start-show', () => {
+        console.log('🎬 Получена команда: start-show');
+        startShow();
+    });
+    
+    socket.on('thank-you', () => {
+        console.log('❤️ Получена команда: thank-you');
+        showThankYou();
+    });
+    
+    socket.on('color-change', (color) => {
+        console.log('🎨 Получен цвет:', color);
+        stopStrobe();
+        document.body.style.backgroundColor = color;
+        setTimeout(() => {
+            if (document.body.style.backgroundColor === color) {
+                document.body.style.backgroundColor = '';
+                document.body.style.animation = 'gradientShift 8s ease infinite alternate';
+            }
+        }, 400);
+    });
+    
+    socket.on('strobe-start', () => {
+        console.log('⚡ Получена команда: strobe-start');
+        startStrobe();
+    });
+    
+    socket.on('strobe-stop', () => {
+        console.log('⚡ Получена команда: strobe-stop');
         stopStrobe();
     });
 </script>
