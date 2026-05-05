@@ -21,6 +21,7 @@
             animation: gradientShift 8s ease infinite alternate;
             color: rgba(255, 255, 255, 0.95);
             padding: 2rem;
+            transition: background-color 0.05s linear;
         }
         @keyframes gradientShift {
             0% { background: linear-gradient(135deg, #0a1a3a, #1a2a4a); }
@@ -82,13 +83,25 @@
             right: 0;
             text-align: center;
         }
+        .strobe-active-warning {
+            position: fixed;
+            top: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            background: rgba(255,45,85,0.8);
+            padding: 8px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            z-index: 100;
+        }
     </style>
 </head>
 <body>
 <div class="container" id="joinScreen">
     <div>🎫 Введите 4-значный код</div>
     <div class="code-input">
-        <input type="text" id="roomCodeInput" maxlength="4" placeholder="0000" style="font-size:2rem;width:120px;">
+        <input type="text" id="roomCodeInput" maxlength="4" placeholder="0000">
     </div>
     <button id="joinBtn">Подключиться</button>
     <div class="connected-status" id="statusMsg">Введите код, чтобы присоединиться к шоу</div>
@@ -104,7 +117,6 @@
 <script>
     const socket = io();
     
-    // Фразы гостя (меняются автоматически каждые 60 секунд)
     const messages = [
         "✨ РГУТИС ЭТО Я, РГУТИС ЭТО МЫ ✨",
         "🎤 НЕ ЗАБУДЬ ГРОМКО ПОДДЕРЖИВАТЬ ВЫСТУПАЮЩИХ 🎤",
@@ -115,6 +127,9 @@
     
     let currentIndex = 0;
     let currentRoomCode = null;
+    let autoInterval = null;
+    let strobeInterval = null;
+    let originalBackground = null;
     
     function updateMessage() {
         const msgEl = document.getElementById('mainMessage');
@@ -127,15 +142,55 @@
         }
     }
     
-    // Автосмена фраз каждые 60 секунд
-    setInterval(() => {
-        if (currentRoomCode) {
-            currentIndex = (currentIndex + 1) % messages.length;
-            updateMessage();
-        }
-    }, 60000);
+    function startAutoSwitch() {
+        if (autoInterval) clearInterval(autoInterval);
+        autoInterval = setInterval(() => {
+            if (currentRoomCode) {
+                currentIndex = (currentIndex + 1) % messages.length;
+                updateMessage();
+            }
+        }, 60000);
+    }
     
-    // Поддержка кода из URL (если перешли по ссылке с ?code=1234)
+    function stopStrobe() {
+        if (strobeInterval) {
+            clearInterval(strobeInterval);
+            strobeInterval = null;
+        }
+        // Возвращаем нормальный фон (убираем все инлайн-стили)
+        document.body.style.backgroundColor = '';
+        document.body.style.backgroundImage = '';
+        document.body.style.animation = 'gradientShift 8s ease infinite alternate';
+        // Убираем предупреждение, если есть
+        const warning = document.getElementById('strobeWarning');
+        if (warning) warning.remove();
+    }
+    
+    function startStrobe() {
+        stopStrobe();
+        // Сохраняем текущий фон для восстановления после стробоскопа
+        originalBackground = document.body.style.backgroundColor;
+        // Убираем градиент и анимацию
+        document.body.style.backgroundImage = 'none';
+        document.body.style.animation = 'none';
+        
+        let isWhite = true;
+        strobeInterval = setInterval(() => {
+            document.body.style.backgroundColor = isWhite ? '#ffffff' : '#000000';
+            isWhite = !isWhite;
+        }, 100); // 10 Гц (10 раз в секунду)
+        
+        // Добавляем предупреждение
+        if (!document.getElementById('strobeWarning')) {
+            const warning = document.createElement('div');
+            warning.id = 'strobeWarning';
+            warning.className = 'strobe-active-warning';
+            warning.innerText = '⚡ СТРОБОСКОП АКТИВЕН ⚡';
+            document.body.appendChild(warning);
+        }
+    }
+    
+    // Поддержка кода из URL
     const urlParams = new URLSearchParams(window.location.search);
     const urlCode = urlParams.get('code');
     if (urlCode && urlCode.length === 4 && /^\d+$/.test(urlCode)) {
@@ -154,14 +209,27 @@
     
     function joinRoom(code) {
         currentRoomCode = code;
-        socket.emit('guest-join', { roomCode: code });
+        socket.emit('guest-join', { code });
         document.getElementById('joinScreen').style.display = 'none';
         document.getElementById('showScreen').style.display = 'block';
         document.getElementById('statusMsg').innerText = '🔄 подключение...';
+        startAutoSwitch();
     }
     
-    socket.on('join-success', () => {
+    socket.on('join-success', (data) => {
         document.getElementById('liveStatus').innerHTML = '✅ вы в шоу';
+        // Если с сервера пришёл активный стробоскоп — запускаем
+        if (data && data.currentMode === 'strobe') {
+            startStrobe();
+        } else if (data && data.currentColor) {
+            document.body.style.backgroundColor = data.currentColor;
+            setTimeout(() => {
+                if (currentRoomCode && document.body.style.backgroundColor !== '') {
+                    document.body.style.backgroundColor = '';
+                    document.body.style.animation = 'gradientShift 8s ease infinite alternate';
+                }
+            }, 300);
+        }
     });
     
     socket.on('join-error', () => {
@@ -169,21 +237,42 @@
         document.getElementById('joinScreen').style.display = 'block';
         document.getElementById('showScreen').style.display = 'none';
         currentRoomCode = null;
+        if (autoInterval) clearInterval(autoInterval);
+        stopStrobe();
     });
     
-    socket.on('command', (cmd) => {
-        if (cmd.mode === 'color') {
-            document.body.style.backgroundColor = cmd.value;
-            setTimeout(() => {
+    socket.on('host-left', () => {
+        alert('Организатор завершил шоу');
+        document.getElementById('joinScreen').style.display = 'block';
+        document.getElementById('showScreen').style.display = 'none';
+        currentRoomCode = null;
+        if (autoInterval) clearInterval(autoInterval);
+        stopStrobe();
+    });
+    
+    // Применение цвета от хоста (останавливает стробоскоп)
+    socket.on('color-change', ({ color }) => {
+        stopStrobe();
+        document.body.style.backgroundColor = color;
+        document.body.style.backgroundImage = 'none';
+        document.body.style.animation = 'none';
+        setTimeout(() => {
+            if (currentRoomCode && document.body.style.backgroundColor === color) {
                 document.body.style.backgroundColor = '';
-            }, 200);
-        } else if (cmd.mode === 'flash') {
-            const originalBg = document.body.style.backgroundColor;
-            document.body.style.backgroundColor = '#ffffff';
-            setTimeout(() => {
-                document.body.style.backgroundColor = originalBg;
-            }, cmd.value);
-        }
+                document.body.style.backgroundImage = '';
+                document.body.style.animation = 'gradientShift 8s ease infinite alternate';
+            }
+        }, 300);
+    });
+    
+    // Запуск стробоскопа
+    socket.on('strobe-start', () => {
+        startStrobe();
+    });
+    
+    // Остановка стробоскопа
+    socket.on('strobe-stop', () => {
+        stopStrobe();
     });
 </script>
 </body>
