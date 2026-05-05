@@ -59,15 +59,19 @@
             right: 0;
             text-align: center;
         }
-        .waiting {
-            position: fixed;
-            top: 20px;
-            left: 0;
-            right: 0;
-            text-align: center;
-            background: rgba(0,0,0,0.6);
-            padding: 8px;
-            font-size: 0.8rem;
+
+        /* Режим шоу — градиент выключен, текст скрыт */
+        body.show-mode {
+            animation: none;
+            background: #000000 !important;
+            transition: background-color 0.1s ease;
+        }
+        body.show-mode .message-text {
+            display: none;
+        }
+        body.show-mode .container {
+            background: transparent;
+            backdrop-filter: none;
         }
     </style>
 </head>
@@ -88,18 +92,22 @@
         "🎤 НЕ ЗАБУДЬ ГРОМКО ПОДДЕРЖИВАТЬ ВЫСТУПАЮЩИХ 🎤",
         "💫 ТЫ ВЫГЛЯДИШЬ СНОГСШИБАТЕЛЬНО 💫",
         "😊 ХОРОШЕГО НАСТРОЕНИЯ! 😊",
-        "🚀 МЫ СКОРО НАЧНЕМ 🚀"
+        "🚀 МЫ СКОРО НАЧНЕМ 🚀",
+        "💖 СПАСИБО ЗА НЕВЕРОЯТНЫЕ ЭМОЦИИ 💖"
     ];
     
     let currentIndex = 0;
     let autoInterval = null;
     let strobeInterval = null;
-    let textVisible = true;
+    let isShowMode = false;      // режим шоу (текст скрыт, градиент выключен)
+    let currentColor = null;     // текущий цвет, установленный хостом
+    
     const messageEl = document.getElementById('mainMessage');
     const statusEl = document.getElementById('statusMsg');
+    const bodyEl = document.body;
     
     function updateMessage() {
-        if (textVisible && messageEl) {
+        if (!isShowMode && messageEl) {
             messageEl.style.opacity = '0';
             setTimeout(() => {
                 messageEl.innerText = messages[currentIndex];
@@ -111,38 +119,77 @@
     function startAutoSwitch() {
         if (autoInterval) clearInterval(autoInterval);
         autoInterval = setInterval(() => {
-            if (textVisible) {
+            if (!isShowMode) {
                 currentIndex = (currentIndex + 1) % messages.length;
                 updateMessage();
             }
         }, 60000);
     }
     
+    // Остановка стробоскопа
     function stopStrobe() {
         if (strobeInterval) {
             clearInterval(strobeInterval);
             strobeInterval = null;
         }
-        document.body.style.backgroundColor = '';
-        document.body.style.backgroundImage = '';
-        document.body.style.animation = 'gradientShift 8s ease infinite alternate';
+        // Восстанавливаем цвет после стробоскопа
+        if (isShowMode) {
+            if (currentColor) {
+                bodyEl.style.backgroundColor = currentColor;
+            } else {
+                bodyEl.style.backgroundColor = '#000000';
+            }
+        } else {
+            bodyEl.style.backgroundColor = '';
+            bodyEl.style.backgroundImage = '';
+            bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
+        }
     }
     
+    // Запуск стробоскопа
     function startStrobe() {
         stopStrobe();
-        document.body.style.backgroundImage = 'none';
-        document.body.style.animation = 'none';
+        // Убираем всё лишнее
+        bodyEl.style.backgroundImage = 'none';
+        bodyEl.style.animation = 'none';
         let isWhite = true;
         strobeInterval = setInterval(() => {
-            document.body.style.backgroundColor = isWhite ? '#ffffff' : '#000000';
+            bodyEl.style.backgroundColor = isWhite ? '#ffffff' : '#000000';
             isWhite = !isWhite;
-        }, 80); // ~12.5 раз в секунду
+        }, 80);
     }
     
-    function hideText() {
-        textVisible = false;
-        messageEl.classList.add('hidden');
+    // Переход в режим шоу (убираем текст, выключаем градиент)
+    function enterShowMode() {
+        isShowMode = true;
+        bodyEl.classList.add('show-mode');
+        // Убираем градиент и ставим чёрный фон
+        bodyEl.style.backgroundImage = 'none';
+        bodyEl.style.animation = 'none';
+        bodyEl.style.backgroundColor = '#000000';
+        currentColor = '#000000';
         statusEl.innerHTML = '🎬 ШОУ ИДЁТ! наслаждайся светом';
+    }
+    
+    // Смена цвета от хоста
+    function setColor(color) {
+        // Останавливаем стробоскоп, если был
+        if (strobeInterval) {
+            stopStrobe();
+        }
+        currentColor = color;
+        bodyEl.style.backgroundColor = color;
+        // Если не в режиме шоу — возвращаем градиент через 0.4 сек
+        if (!isShowMode) {
+            setTimeout(() => {
+                if (!isShowMode && !strobeInterval && bodyEl.style.backgroundColor === color) {
+                    bodyEl.style.backgroundColor = '';
+                    bodyEl.style.backgroundImage = '';
+                    bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
+                }
+            }, 400);
+        }
+        console.log('🎨 Цвет применён:', color);
     }
     
     // Регистрация гостя
@@ -154,32 +201,30 @@
     });
     
     socket.on('guest-connected', () => {
-        console.log('Гость зарегистрирован');
+        console.log('👤 Гость зарегистрирован');
         statusEl.innerHTML = '✨ ожидаем начала шоу';
         startAutoSwitch();
     });
     
+    // Приём цвета от хоста
     socket.on('color-change', (color) => {
-        stopStrobe();
-        document.body.style.backgroundColor = color;
-        setTimeout(() => {
-            if (document.body.style.backgroundColor === color) {
-                document.body.style.backgroundColor = '';
-                document.body.style.animation = 'gradientShift 8s ease infinite alternate';
-            }
-        }, 400);
+        console.log('🎨 Получен цвет от хоста:', color);
+        setColor(color);
     });
     
     socket.on('strobe-start', () => {
+        console.log('⚡ Стробоскоп включён');
         startStrobe();
     });
     
     socket.on('strobe-stop', () => {
+        console.log('⚡ Стробоскоп выключен');
         stopStrobe();
     });
     
     socket.on('show-start', () => {
-        hideText();
+        console.log('🎬 Режим шоу активирован');
+        enterShowMode();
     });
     
     socket.on('host-disconnected', () => {
