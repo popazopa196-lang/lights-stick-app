@@ -44,6 +44,10 @@
             backdrop-filter: none !important;
             padding: 0 !important;
         }
+        body.show-mode {
+            background: #0a1a3a !important;
+            animation: none !important;
+        }
         .message-text {
             font-size: clamp(1.8rem, 7vw, 3rem);
             line-height: 1.3;
@@ -76,6 +80,7 @@
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
+    // ПОДКЛЮЧАЕМСЯ К ТОМУ ЖЕ СЕРВЕРУ, ОТКУДА ПРИШЛА СТРАНИЦА
     const socket = io();
     
     const messages = [
@@ -118,10 +123,16 @@
             clearInterval(strobeInterval);
             strobeInterval = null;
         }
-        // Возвращаем градиент
-        bodyEl.style.backgroundColor = '';
-        bodyEl.style.backgroundImage = '';
-        bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
+        // Возвращаем градиент, если не в режиме шоу
+        if (!bodyEl.classList.contains('show-mode')) {
+            bodyEl.style.backgroundColor = '';
+            bodyEl.style.backgroundImage = '';
+            bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
+        } else {
+            bodyEl.style.backgroundColor = '#0a1a3a';
+            bodyEl.style.backgroundImage = 'none';
+            bodyEl.style.animation = 'none';
+        }
     }
     
     function startStrobe() {
@@ -138,11 +149,11 @@
     function startShow() {
         textVisible = false;
         messageEl.classList.add('hidden');
-        bodyEl.classList.add('show-mode'); // убираем полупрозрачный фон
+        bodyEl.classList.add('show-mode');
+        bodyEl.style.backgroundColor = '#0a1a3a';
+        bodyEl.style.backgroundImage = 'none';
+        bodyEl.style.animation = 'none';
         stopStrobe();
-        bodyEl.style.backgroundColor = '';
-        bodyEl.style.backgroundImage = '';
-        bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
     }
     
     function showThankYou() {
@@ -150,6 +161,9 @@
         messageEl.classList.remove('hidden');
         bodyEl.classList.remove('show-mode');
         messageEl.innerText = "❤️ СПАСИБО ЗА НЕВЕРОЯТНЫЕ ЭМОЦИИ ❤️";
+        bodyEl.style.backgroundColor = '';
+        bodyEl.style.backgroundImage = '';
+        bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
         setTimeout(() => {
             if (textVisible && !bodyEl.classList.contains('show-mode')) {
                 currentIndex = 0;
@@ -186,10 +200,15 @@
         console.log('🎨 Получен цвет:', color);
         stopStrobe();
         bodyEl.style.backgroundColor = color;
+        bodyEl.style.backgroundImage = 'none';
+        bodyEl.style.animation = 'none';
         setTimeout(() => {
-            if (bodyEl.style.backgroundColor === color) {
+            if (!bodyEl.classList.contains('show-mode')) {
                 bodyEl.style.backgroundColor = '';
+                bodyEl.style.backgroundImage = '';
                 bodyEl.style.animation = 'gradientShift 8s ease infinite alternate';
+            } else {
+                bodyEl.style.backgroundColor = '#0a1a3a';
             }
         }, 400);
     });
