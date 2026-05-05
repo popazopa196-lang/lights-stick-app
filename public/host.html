@@ -31,23 +31,35 @@
             font-size: 1.6rem;
             margin: 0 0 8px;
         }
-        .qr {
+        .room-info {
             background: #0c1018;
             border-radius: 24px;
-            padding: 16px;
+            padding: 20px;
             margin: 16px 0;
         }
-        #qrCanvas {
-            background: white;
-            border-radius: 16px;
-            margin-bottom: 10px;
-        }
-        .url {
+        .guest-link {
             background: #00000066;
-            padding: 8px;
-            border-radius: 40px;
-            font-size: 0.7rem;
+            padding: 12px;
+            border-radius: 60px;
+            font-size: 0.9rem;
             word-break: break-all;
+            font-family: monospace;
+            margin-bottom: 16px;
+        }
+        .room-code {
+            font-size: 2.5rem;
+            font-weight: bold;
+            letter-spacing: 8px;
+            background: #1e2a3a;
+            padding: 12px;
+            border-radius: 32px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        .instruction {
+            font-size: 0.85rem;
+            color: #8e9aaf;
+            margin-top: 12px;
         }
         .color-grid {
             display: grid;
@@ -85,16 +97,35 @@
             padding: 10px;
             margin-top: 16px;
         }
+        .refresh-btn {
+            background: #2a3a50;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 16px;
+            margin-top: 10px;
+            color: white;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>✨ Lights Stick App</h1>
-    <p>Пульт организатора (цвет + вспышка)</p>
+    <p>Пульт организатора</p>
 
-    <div class="qr">
-        <canvas id="qrCanvas" width="160" height="160"></canvas>
-        <div class="url" id="guestUrl">Загрузка...</div>
+    <div class="room-info">
+        <div style="margin-bottom: 8px;">🔗 Ссылка для гостей:</div>
+        <div class="guest-link" id="guestUrlDisplay">Загрузка...</div>
+        
+        <div style="margin: 16px 0 8px;">🎫 Код комнаты (введите вручную):</div>
+        <div class="room-code" id="roomCode">1234</div>
+        
+        <div class="instruction">
+            📱 ГОСТИ: откройте в браузере ссылку выше<br>
+            или введите код комнаты на сайте<br>
+            <span style="font-size:0.75rem;">а затем нажмите "Подключиться"</span>
+        </div>
+        <button class="refresh-btn" id="refreshCodeBtn">🔄 Новый код</button>
     </div>
 
     <div class="color-grid">
@@ -111,45 +142,54 @@
     <div class="counter">
         📱 Гостей в зале: <span id="connectedCount">0</span>
     </div>
-    <div style="font-size: 11px; margin-top: 16px;">Гости сканируют QR → видят смену фраз каждые 60 секунд</div>
+    <div style="font-size: 11px; margin-top: 16px;">Гости подключаются по ссылке или коду комнаты</div>
 </div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
 <script>
     const socket = io();
-
-    function generateGuestLink() {
+    
+    // Генерация случайного 4-значного кода
+    function generateRoomCode() {
+        return Math.floor(1000 + Math.random() * 9000).toString();
+    }
+    
+    let currentRoomCode = generateRoomCode();
+    
+    function updateRoomInfo() {
         const base = window.location.origin;
-        const guestUrl = base + '/guest.html';
-        document.getElementById('guestUrl').innerText = guestUrl;
-        new QRCode(document.getElementById('qrCanvas'), {
-            text: guestUrl,
-            width: 160,
-            height: 160
-        });
+        const guestUrl = base + '/guest.html?code=' + currentRoomCode;
+        document.getElementById('guestUrlDisplay').innerText = guestUrl;
+        document.getElementById('roomCode').innerText = currentRoomCode;
+        
+        // Отправляем код на сервер, чтобы гости могли подключиться
+        socket.emit('host-set-room', { code: currentRoomCode });
     }
-
+    
     function sendCommand(mode, value) {
-        socket.emit('host-command', { mode, value });
-        console.log('Команда отправлена:', mode, value);
+        socket.emit('host-command', { mode, value, roomCode: currentRoomCode });
     }
-
+    
     document.querySelectorAll('.color-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             sendCommand('color', btn.getAttribute('data-color'));
         });
     });
-
+    
     document.getElementById('flashBtn').addEventListener('click', () => {
         sendCommand('flash', 3000);
     });
-
+    
+    document.getElementById('refreshCodeBtn').addEventListener('click', () => {
+        currentRoomCode = generateRoomCode();
+        updateRoomInfo();
+    });
+    
     socket.on('clients-update', (count) => {
         document.getElementById('connectedCount').innerText = count;
     });
-
-    generateGuestLink();
+    
+    updateRoomInfo();
 </script>
 </body>
 </html>
